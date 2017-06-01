@@ -5,7 +5,7 @@ HTerrain::HTerrain() {
 	_collision_enabled = true;
 
 	// TODO TEST
-	set_resolution(4096);
+	set_resolution(64);
 	Point2i size = _data.size();
 	Point2i pos;
 	for(pos.y = 0; pos.y < size.y; ++pos.y) {

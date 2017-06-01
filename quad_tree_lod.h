@@ -102,24 +102,24 @@ public:
 		make_chunks_recursively(_tree, _max_depth, callbacks_context);
 	}
 
-	inline int get_lod_size(int lod) {
+	inline int get_lod_size(int lod) const {
 		return 1 << lod;
 	}
 
-	inline int get_split_distance(int lod) {
+	inline int get_split_distance(int lod) const {
 		return _base_size * get_lod_size(lod) * 2.0;
 	}
 
 	// Takes a rectangle in highest LOD coordinates,
 	// and calls a function on all chunks of that LOD or higher LODs.
-	void for_chunks_in_rect(QueryFunc action_cb, Point2i cpos0, Point2i csize, void *callback_context) {
+	void for_chunks_in_rect(QueryFunc action_cb, Point2i cpos0, Point2i csize, void *callback_context) const {
 
 		// For each lod
 		for (int lod = 0; lod < _grids.size(); ++lod) {
 
 			// Get grid and chunk size
-			HashMap<T> &grid = _grids[lod];
-			int s = get_lod_size(lod_index);
+			const HashMap<Point2i, T> &grid = _grids[lod];
+			int s = get_lod_size(lod);
 
 			// Convert rect into this lod's coordinates
 			Point2i min = cpos0 / s;
@@ -130,11 +130,11 @@ public:
 			for (cpos.y = min.y; cpos.y < max.y; ++cpos.y) {
 				for (cpos.x = min.x; cpos.x < max.x; ++cpos.x) {
 
-					T *chunk_ptr = grid.getptr(cpos);
+					T const *chunk_ptr = grid.getptr(cpos);
 
 					if (chunk_ptr) {
 						T chunk = *chunk_ptr;
-						action_cb(callback_context, chunk, k, lod_index);
+						action_cb(callback_context, chunk, cpos, lod);
 					}
 				}
 			}

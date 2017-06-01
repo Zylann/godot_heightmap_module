@@ -12,7 +12,9 @@
 class HTerrain : public Spatial {
 	GDCLASS(HTerrain, Spatial)
 public:
-	static const int CHUNK_SIZE = 16;
+	//static const int CHUNK_SIZE = 16;
+	// Workaround because GCC doesn't links the line above properly
+	enum { CHUNK_SIZE = 16 };
 
 	HTerrain();
 	~HTerrain();
