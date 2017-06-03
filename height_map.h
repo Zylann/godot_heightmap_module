@@ -36,6 +36,7 @@ private:
 	HeightMapChunk *_make_chunk_cb(Point2i origin, int lod);
 	void _recycle_chunk_cb(HeightMapChunk *chunk);
 
+	void set_chunk_dirty(Point2i pos, int lod);
 	void update_chunk(HeightMapChunk & chunk, int lod);
 
 	static void _bind_methods();
@@ -43,17 +44,15 @@ private:
 	static void s_recycle_chunk_cb(void *context, HeightMapChunk *chunk);
 
 private:
-	struct PendingChunkUpdate {
-		Point2i pos;
-		int lod;
-	};
-
 	Ref<Material> _material;
 	bool _collision_enabled;
 	HeightMapData _data;
 	HeightMapMesher _mesher;
 	QuadTreeLod<HeightMapChunk*> _lodder;
-	Vector<PendingChunkUpdate> _pending_chunk_updates;
+
+	// Pending chunk updates indexed by lod
+	// Note: needed Vector<HashSet<Point2i>> but HashSet doesn't exist so I use a placeholder bool.
+	Vector<HashMap<Point2i,bool> > _pending_chunk_updates;
 };
 
 

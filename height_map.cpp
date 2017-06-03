@@ -88,16 +88,21 @@ void HeightMap::_process() {
 	_lodder.update(viewer_pos, this);
 
 	// Update chunks
-	if(_pending_chunk_updates.size() != 0)
-		print_line(String("Updating {0} chunks").format(varray(_pending_chunk_updates.size())));
-	for(int i = 0; i < _pending_chunk_updates.size(); ++i) {
-		PendingChunkUpdate u = _pending_chunk_updates[i];
-		HeightMapChunk *chunk = NULL;
-		_lodder.try_get_chunk_at(chunk, u.pos, u.lod);
-		ERR_FAIL_COND(chunk == NULL);
-		update_chunk(*chunk, u.lod);
+	for(int lod = 0; lod < _pending_chunk_updates.size(); ++lod) {
+		HashMap<Point2i,bool> & pending_chunks = _pending_chunk_updates[lod];
+		if(pending_chunks.size() != 0) {
+
+			const Point2i *key = NULL;
+			while (key = pending_chunks.next(key)) {
+
+				HeightMapChunk *chunk = NULL;
+				_lodder.try_get_chunk_at(chunk, *key, lod);
+				ERR_FAIL_COND(chunk == NULL);
+				update_chunk(*chunk, lod);
+			}
+		}
+		pending_chunks.clear();
 	}
-	_pending_chunk_updates.clear();
 }
 
 void HeightMap::update_chunk(HeightMapChunk & chunk, int lod) {
@@ -118,16 +123,22 @@ void HeightMap::update_chunk(HeightMapChunk & chunk, int lod) {
 
 HeightMapChunk *HeightMap::_make_chunk_cb(Point2i origin, int lod) {
 	int lod_size = _lodder.get_lod_size(lod);
-	Point2i cell_origin = origin * CHUNK_SIZE * lod_size;
+	Point2i origin_in_cells = origin * CHUNK_SIZE * lod_size;
 	HeightMapChunk *chunk = memnew(HeightMapChunk(this));
-	chunk->create(cell_origin, _material);
+	chunk->create(origin_in_cells, _material);
 
-	PendingChunkUpdate u;
-	u.lod = lod;
-	u.pos = origin;
-	_pending_chunk_updates.push_back(u);
+	set_chunk_dirty(origin, lod);
 
 	return chunk;
+}
+
+void HeightMap::set_chunk_dirty(Point2i pos, int lod) {
+	if(_pending_chunk_updates.size() <= lod)
+		_pending_chunk_updates.resize(lod+1);
+	HashMap<Point2i,bool> &pending_chunks = _pending_chunk_updates[lod];
+	// Note: if the chunk has already been made dirty,
+	// nothing will change and the chunk will be updated only once when the update step comes.
+	pending_chunks[pos] = true;
 }
 
 void HeightMap::_recycle_chunk_cb(HeightMapChunk *chunk) {
