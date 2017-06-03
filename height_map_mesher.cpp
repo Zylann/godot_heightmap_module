@@ -1,4 +1,4 @@
-#include "hterrain_mesher.h"
+#include "height_map_mesher.h"
 
 // TODO Is this already in engine?
 template <typename T>

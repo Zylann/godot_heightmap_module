@@ -1,4 +1,4 @@
-#include "hterrain_chunk.h"
+#include "height_map_chunk.h"
 
 HeightMapChunk::HeightMapChunk(Node *parent) {
 	_parent = parent;

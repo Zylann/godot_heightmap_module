@@ -1,5 +1,5 @@
 #include <scene/3d/camera.h>
-#include "hterrain.h"
+#include "height_map.h"
 
 #define DEFAULT_RESOLUTION 256
 

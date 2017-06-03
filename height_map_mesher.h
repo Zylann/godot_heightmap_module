@@ -4,7 +4,7 @@
 #include <math/math_2d.h>
 #include <scene/resources/mesh.h>
 
-#include "hterrain_data.h"
+#include "height_map_data.h"
 
 class HeightMapMesher {
 

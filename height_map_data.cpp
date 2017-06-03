@@ -1,4 +1,4 @@
-#include "hterrain.h"
+#include "height_map.h"
 
 
 void HeightMapData::resize(int p_size) {

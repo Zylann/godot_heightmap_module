@@ -2,9 +2,9 @@
 #define HEIGHT_MAP_H
 
 #include <scene/3d/spatial.h>
-#include "hterrain_data.h"
-#include "hterrain_chunk.h"
-#include "hterrain_mesher.h"
+#include "height_map_data.h"
+#include "height_map_chunk.h"
+#include "height_map_mesher.h"
 #include "quad_tree_lod.h"
 
 
