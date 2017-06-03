@@ -3,9 +3,9 @@
 
 void HeightMapData::resize(int p_size) {
 	Point2i size(p_size, p_size);
-	heights.resize(size);
-	normals.resize(size);
-	colors.resize(size);
+	heights.resize(size, true, 0);
+	normals.resize(size, true, Vector3(0,1,0));
+	colors.resize(size, true, Color(1,1,1,1));
 }
 
 void HeightMapData::update_all_normals() {

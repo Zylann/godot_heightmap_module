@@ -41,7 +41,8 @@ private:
 
 	static void _bind_methods();
 	static HeightMapChunk *s_make_chunk_cb(void *context, Point2i origin, int lod);
-	static void s_recycle_chunk_cb(void *context, HeightMapChunk *chunk);
+	static void s_recycle_chunk_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
+	static void s_delete_chunk_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
 
 private:
 	Ref<Material> _material;

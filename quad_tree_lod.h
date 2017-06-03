@@ -4,7 +4,6 @@
 #include <core/hash_map.h>
 #include <core/math/math_2d.h>
 #include <core/math/vector3.h>
-//#include <core/hashfuncs.h>
 #include <core/variant.h>
 
 
@@ -14,8 +13,12 @@ class QuadTreeLod {
 private:
 	struct Node {
 		Node *children[4];
-		T chunk;
 		Point2i origin;
+
+		// Userdata.
+		// Note: the tree doesn't own this field,
+		// if it's a pointer make sure you free it when you don't need it anymore
+		T chunk;
 
 		Node() {
 			chunk = T();
@@ -49,8 +52,8 @@ private:
 
 public:
 	typedef T (*MakeFunc)(void *context, Point2i origin, int lod);
-	typedef void (*RecycleFunc)(void *context, T chunk);
 	typedef void (*QueryFunc)(void *context, T chunk, Point2i origin, int lod);
+	typedef QueryFunc RecycleFunc;
 
 	MakeFunc make_func;
 	RecycleFunc recycle_func;
@@ -67,6 +70,8 @@ public:
 	//~QuadTreeLod() {}
 
 	void create_from_sizes(int base_size, int full_size) {
+		for_all_chunks(recycle_func, callbacks_context);
+
 		_grids.clear();
 		_tree.clear_children();
 
@@ -108,6 +113,10 @@ public:
 
 	inline int get_split_distance(int lod) const {
 		return _base_size * get_lod_size(lod) * 2.0;
+	}
+
+	void for_all_chunks(QueryFunc action_cb, void *callback_context) {
+		for_all_chunks_recursive(action_cb, callback_context, _tree, _max_depth);
 	}
 
 	// Takes a rectangle in highest LOD coordinates,
@@ -154,7 +163,7 @@ private:
 
 	void recycle_chunk(void *callbacks_context, T chunk, Point2i origin, int lod) {
 		if (recycle_func)
-			recycle_func(callbacks_context, chunk);
+			recycle_func(callbacks_context, chunk, origin, lod);
 		_grids[lod].erase(origin);
 	}
 
@@ -227,6 +236,20 @@ private:
 				node.chunk = make_chunk(callbacks_context, lod, node.origin);
 				// Note: if you don't return anything here,
 				// make_chunk will continue being called
+			}
+		}
+	}
+
+	void for_all_chunks_recursive(QueryFunc action_cb, void *callback_context, Node &node, int lod) {
+		ERR_FAIL_COND(lod < 0);
+		if(node.has_children()) {
+			for(int i = 0; i < 4; ++i) {
+				Node *child = node.children[i];
+				for_all_chunks_recursive(action_cb, callback_context, *child, lod -1);
+			}
+		} else {
+			if(node.chunk) {
+				action_cb(callback_context, node.chunk, node.origin, lod);
 			}
 		}
 	}

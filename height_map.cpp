@@ -7,7 +7,10 @@
 HeightMap::HeightMap() {
 	_collision_enabled = true;
 
-	// TODO TEST
+	_lodder.make_func = s_make_chunk_cb;
+	_lodder.recycle_func = s_recycle_chunk_cb;
+
+	// TODO TEST, WONT REMAIN HERE
 	set_resolution(DEFAULT_RESOLUTION);
 	Point2i size = _data.size();
 	Point2i pos;
@@ -21,12 +24,11 @@ HeightMap::HeightMap() {
 	_data.update_all_normals();
 
 	_lodder.create_from_sizes(CHUNK_SIZE, _data.size().x);
-	_lodder.make_func = s_make_chunk_cb;
-	_lodder.recycle_func = s_recycle_chunk_cb;
 }
 
 HeightMap::~HeightMap() {
-
+	// Free chunks
+	_lodder.for_all_chunks(s_delete_chunk_cb, this);
 }
 
 void HeightMap::set_material(Ref<Material> p_material) {
@@ -51,7 +53,7 @@ void HeightMap::set_resolution(int p_res) {
 
 	if(p_res != get_resolution()) {
 		_data.resize(p_res);
-		// TODO Update chunks
+		_lodder.create_from_sizes(CHUNK_SIZE, _data.size().x);
 	}
 }
 
@@ -171,8 +173,13 @@ HeightMapChunk *HeightMap::s_make_chunk_cb(void *context, Point2i origin, int lo
 }
 
 // static
-void HeightMap::s_recycle_chunk_cb(void *context, HeightMapChunk *chunk) {
+void HeightMap::s_recycle_chunk_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod) {
 	HeightMap *self = reinterpret_cast<HeightMap*>(context);
 	self->_recycle_chunk_cb(chunk);
+}
+
+// static
+void HeightMap::s_delete_chunk_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod) {
+	memdelete(chunk);
 }
 
