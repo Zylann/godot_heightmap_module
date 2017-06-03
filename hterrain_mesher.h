@@ -1,12 +1,12 @@
-#ifndef HTERRAIN_MESHER_H
-#define HTERRAIN_MESHER_H
+#ifndef HEIGHT_MAP_MESHER_H
+#define HEIGHT_MAP_MESHER_H
 
 #include <math/math_2d.h>
 #include <scene/resources/mesh.h>
 
 #include "hterrain_data.h"
 
-class HTerrainMesher {
+class HeightMapMesher {
 
 public:
 	struct Params {
@@ -23,7 +23,7 @@ public:
 		}
 	};
 
-	Ref<Mesh> make_chunk(Params params, const HTerrainData &data);
+	Ref<Mesh> make_chunk(Params params, const HeightMapData &data);
 
 private:
 	Vector<Vector3> _output_vertices;
@@ -33,4 +33,4 @@ private:
 	Vector<int> _output_indices;
 };
 
-#endif // HTERRAIN_MESHER_H
+#endif // HEIGHT_MAP_MESHER_H

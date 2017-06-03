@@ -1,10 +1,10 @@
 #include "hterrain_chunk.h"
 
-HTerrainChunk::HTerrainChunk(Node *parent) {
+HeightMapChunk::HeightMapChunk(Node *parent) {
 	_parent = parent;
 }
 
-void HTerrainChunk::create(Point2i cell_pos, Ref<Material> material) {
+void HeightMapChunk::create(Point2i cell_pos, Ref<Material> material) {
 	cell_origin = cell_pos;
 
 	MeshInstance *mesh_instance = get_mesh_instance();
@@ -25,7 +25,7 @@ void HTerrainChunk::create(Point2i cell_pos, Ref<Material> material) {
 	}
 }
 
-void HTerrainChunk::clear() {
+void HeightMapChunk::clear() {
 	MeshInstance *mesh_instance = get_mesh_instance();
 	if(mesh_instance)
 		mesh_instance->queue_delete();
@@ -33,13 +33,13 @@ void HTerrainChunk::clear() {
 //		collider->queue_delete();
 }
 
-void HTerrainChunk::set_mesh(Ref<Mesh> mesh) {
+void HeightMapChunk::set_mesh(Ref<Mesh> mesh) {
 	MeshInstance *mesh_instance = get_mesh_instance();
 	if(mesh_instance)
 		mesh_instance->set_mesh(mesh);
 }
 
-MeshInstance *HTerrainChunk::get_mesh_instance() {
+MeshInstance *HeightMapChunk::get_mesh_instance() {
 	if (_mesh_instance_path.is_empty())
 		return NULL;
 	Node * n = _parent->get_node(_mesh_instance_path);

@@ -13,7 +13,7 @@ void copy_to(PoolVector<T> &to, Vector<T> &from) {
 	}
 }
 
-Ref<Mesh> HTerrainMesher::make_chunk(Params params, const HTerrainData &data) {
+Ref<Mesh> HeightMapMesher::make_chunk(Params params, const HeightMapData &data) {
 
 	_output_vertices.clear();
 	_output_normals.clear();

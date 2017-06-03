@@ -1,11 +1,14 @@
 #include <scene/3d/camera.h>
 #include "hterrain.h"
 
-HTerrain::HTerrain() {
+#define DEFAULT_RESOLUTION 256
+
+
+HeightMap::HeightMap() {
 	_collision_enabled = true;
 
 	// TODO TEST
-	set_resolution(64);
+	set_resolution(DEFAULT_RESOLUTION);
 	Point2i size = _data.size();
 	Point2i pos;
 	for(pos.y = 0; pos.y < size.y; ++pos.y) {
@@ -22,21 +25,21 @@ HTerrain::HTerrain() {
 	_lodder.recycle_func = s_recycle_chunk_cb;
 }
 
-HTerrain::~HTerrain() {
+HeightMap::~HeightMap() {
 
 }
 
-void HTerrain::set_material(Ref<Material> p_material) {
+void HeightMap::set_material(Ref<Material> p_material) {
 	_material = p_material;
 	// TODO Update chunks
 }
 
-void HTerrain::set_collision_enabled(bool enabled) {
+void HeightMap::set_collision_enabled(bool enabled) {
 	_collision_enabled = enabled;
 	// TODO Update chunks
 }
 
-void HTerrain::set_resolution(int p_res) {
+void HeightMap::set_resolution(int p_res) {
 
 	if(p_res < CHUNK_SIZE)
 		p_res = CHUNK_SIZE;
@@ -52,11 +55,11 @@ void HTerrain::set_resolution(int p_res) {
 	}
 }
 
-int HTerrain::get_resolution() const {
+int HeightMap::get_resolution() const {
 	return _data.size().x;
 }
 
-void HTerrain::_notification(int p_what) {
+void HeightMap::_notification(int p_what) {
 	switch(p_what) {
 
 	case NOTIFICATION_ENTER_TREE:
@@ -69,7 +72,7 @@ void HTerrain::_notification(int p_what) {
 	}
 }
 
-void HTerrain::_process() {
+void HeightMap::_process() {
 
 	// Get viewer pos
 	Vector3 viewer_pos;
@@ -89,7 +92,7 @@ void HTerrain::_process() {
 		print_line(String("Updating {0} chunks").format(varray(_pending_chunk_updates.size())));
 	for(int i = 0; i < _pending_chunk_updates.size(); ++i) {
 		PendingChunkUpdate u = _pending_chunk_updates[i];
-		HTerrainChunk *chunk = NULL;
+		HeightMapChunk *chunk = NULL;
 		_lodder.try_get_chunk_at(chunk, u.pos, u.lod);
 		ERR_FAIL_COND(chunk == NULL);
 		update_chunk(*chunk, u.lod);
@@ -97,9 +100,9 @@ void HTerrain::_process() {
 	_pending_chunk_updates.clear();
 }
 
-void HTerrain::update_chunk(HTerrainChunk & chunk, int lod) {
+void HeightMap::update_chunk(HeightMapChunk & chunk, int lod) {
 
-	HTerrainMesher::Params mesher_params;
+	HeightMapMesher::Params mesher_params;
 	mesher_params.lod = lod;
 	mesher_params.origin = chunk.cell_origin;
 	mesher_params.size = Point2i(CHUNK_SIZE, CHUNK_SIZE);
@@ -113,10 +116,10 @@ void HTerrain::update_chunk(HTerrainChunk & chunk, int lod) {
 	}
 }
 
-HTerrainChunk *HTerrain::_make_chunk_cb(Point2i origin, int lod) {
+HeightMapChunk *HeightMap::_make_chunk_cb(Point2i origin, int lod) {
 	int lod_size = _lodder.get_lod_size(lod);
 	Point2i cell_origin = origin * CHUNK_SIZE * lod_size;
-	HTerrainChunk *chunk = memnew(HTerrainChunk(this));
+	HeightMapChunk *chunk = memnew(HeightMapChunk(this));
 	chunk->create(cell_origin, _material);
 
 	PendingChunkUpdate u;
@@ -127,29 +130,38 @@ HTerrainChunk *HTerrain::_make_chunk_cb(Point2i origin, int lod) {
 	return chunk;
 }
 
-void HTerrain::_recycle_chunk_cb(HTerrainChunk *chunk) {
+void HeightMap::_recycle_chunk_cb(HeightMapChunk *chunk) {
 	chunk->clear();
 	memdelete(chunk);
 }
 
-void HTerrain::_bind_methods() {
+void HeightMap::_bind_methods() {
 
-	ClassDB::bind_method(D_METHOD("get_material:Material"), &HTerrain::get_material);
-	ClassDB::bind_method(D_METHOD("set_material(material:Material)"), &HTerrain::set_material);
+	// TODO API subject to change as the module heads to a more efficient implementation
 
-	ClassDB::bind_method(D_METHOD("is_collision_enabled"), &HTerrain::is_collision_enabled);
-	ClassDB::bind_method(D_METHOD("set_collision_enabled"), &HTerrain::set_collision_enabled);
+	ClassDB::bind_method(D_METHOD("get_material:Material"), &HeightMap::get_material);
+	ClassDB::bind_method(D_METHOD("set_material(material:Material)"), &HeightMap::set_material);
+
+	ClassDB::bind_method(D_METHOD("is_collision_enabled"), &HeightMap::is_collision_enabled);
+	ClassDB::bind_method(D_METHOD("set_collision_enabled"), &HeightMap::set_collision_enabled);
+
+	ClassDB::bind_method(D_METHOD("set_resolution"), &HeightMap::set_resolution);
+	ClassDB::bind_method(D_METHOD("get_resolution"), &HeightMap::get_resolution);
+
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "material"), "set_material", "get_material");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "collision_enabled"), "set_collision_enabled", "is_collision_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "resolution"), "set_resolution", "get_resolution");
 }
 
 // static
-HTerrainChunk *HTerrain::s_make_chunk_cb(void *context, Point2i origin, int lod) {
-	HTerrain *self = reinterpret_cast<HTerrain*>(context);
+HeightMapChunk *HeightMap::s_make_chunk_cb(void *context, Point2i origin, int lod) {
+	HeightMap *self = reinterpret_cast<HeightMap*>(context);
 	return self->_make_chunk_cb(origin, lod);
 }
 
 // static
-void HTerrain::s_recycle_chunk_cb(void *context, HTerrainChunk *chunk) {
-	HTerrain *self = reinterpret_cast<HTerrain*>(context);
+void HeightMap::s_recycle_chunk_cb(void *context, HeightMapChunk *chunk) {
+	HeightMap *self = reinterpret_cast<HeightMap*>(context);
 	self->_recycle_chunk_cb(chunk);
 }
 

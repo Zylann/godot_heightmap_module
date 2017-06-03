@@ -1,5 +1,5 @@
-#ifndef HTERRAIN_DATA_H
-#define HTERRAIN_DATA_H
+#ifndef HEIGHT_MAP_DATA_H
+#define HEIGHT_MAP_DATA_H
 
 #include <core/math/vector3.h>
 #include <core/color.h>
@@ -7,7 +7,7 @@
 #include "grid.h"
 
 
-class HTerrainData {
+class HeightMapData {
 public:
 
 	void update_all_normals();
@@ -24,6 +24,6 @@ public:
 };
 
 
-#endif // HTERRAIN_DATA_H
+#endif // HEIGHT_MAP_DATA_H
 
 

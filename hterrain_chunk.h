@@ -1,15 +1,15 @@
-#ifndef HTERRAIN_CHUNK_H
-#define HTERRAIN_CHUNK_H
+#ifndef HEIGHT_MAP_CHUNK_H
+#define HEIGHT_MAP_CHUNK_H
 
 #include <math/math_2d.h>
 #include <scene/3d/mesh_instance.h>
 
 // Container for chunk objects
-class HTerrainChunk {
+class HeightMapChunk {
 public:
 	Point2i cell_origin;
 
-	HTerrainChunk(Node *parent);
+	HeightMapChunk(Node *parent);
 
 	void create(Point2i pos, Ref<Material> material);
 	void set_mesh(Ref<Mesh> mesh);
@@ -28,5 +28,5 @@ private:
 };
 
 
-#endif // HTERRAIN_CHUNK_H
+#endif // HEIGHT_MAP_CHUNK_H
 

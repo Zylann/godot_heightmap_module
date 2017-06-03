@@ -1,18 +1,18 @@
 #include "hterrain.h"
 
 
-void HTerrainData::resize(int p_size) {
+void HeightMapData::resize(int p_size) {
 	Point2i size(p_size, p_size);
 	heights.resize(size);
 	normals.resize(size);
 	colors.resize(size);
 }
 
-void HTerrainData::update_all_normals() {
+void HeightMapData::update_all_normals() {
 	update_normals(Point2i(), heights.size());
 }
 
-void HTerrainData::update_normals(Point2i min, Point2i size) {
+void HeightMapData::update_normals(Point2i min, Point2i size) {
 
 	Point2i max = min + size;
 	Point2i pos;
