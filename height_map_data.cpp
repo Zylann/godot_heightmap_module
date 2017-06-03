@@ -20,10 +20,10 @@ void HeightMapData::update_normals(Point2i min, Point2i size) {
 	for(pos.y = min.y; pos.y < max.y; ++pos.y) {
 		for(pos.x = min.x; pos.x < max.x; ++pos.x) {
 
-			float left = heights.get_or_default(pos.x - 1, pos.y);
-			float right = heights.get_or_default(pos.x + 1, pos.y);
-			float fore = heights.get_or_default(pos.x, pos.y + 1);
-			float back = heights.get_or_default(pos.x, pos.y - 1);
+			float left = heights.get_clamped(pos.x - 1, pos.y);
+			float right = heights.get_clamped(pos.x + 1, pos.y);
+			float fore = heights.get_clamped(pos.x, pos.y + 1);
+			float back = heights.get_clamped(pos.x, pos.y - 1);
 
 			normals.set(pos, Vector3(left - right, 2.0, back - fore).normalized());
 		}
