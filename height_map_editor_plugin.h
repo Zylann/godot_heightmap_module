@@ -7,7 +7,6 @@
 #include "height_map_brush.h"
 #include "height_map_brush_panel.h"
 
-
 class HeightMapEditorPlugin : public EditorPlugin {
 	GDCLASS(HeightMapEditorPlugin, EditorPlugin)
 public:
@@ -26,11 +25,11 @@ protected:
 
 private:
 	void on_mode_selected(int mode);
-	void paint(Camera &camera, Vector2 screen_pos, int override_mode=-1);
+	void paint(Camera &camera, Vector2 screen_pos, int override_mode = -1);
 
 private:
 	EditorNode *_editor;
-	HeightMap * _height_map;
+	HeightMap *_height_map;
 	HeightMapBrushPanel *_brush_panel;
 	HBoxContainer *_toolbar;
 	HeightMapBrush _brush;

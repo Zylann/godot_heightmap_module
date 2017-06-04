@@ -13,11 +13,7 @@ void register_hterrain_types() {
 	EditorPlugins::add_by_type<HeightMapEditorPlugin>();
 #endif
 #endif
-
 }
 
 void unregister_hterrain_types() {
-
 }
-
-

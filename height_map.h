@@ -1,12 +1,11 @@
 #ifndef HEIGHT_MAP_H
 #define HEIGHT_MAP_H
 
-#include <scene/3d/spatial.h>
-#include "height_map_data.h"
 #include "height_map_chunk.h"
+#include "height_map_data.h"
 #include "height_map_mesher.h"
 #include "quad_tree_lod.h"
-
+#include <scene/3d/spatial.h>
 
 // Heightmap-based 3D terrain
 class HeightMap : public Spatial {
@@ -42,7 +41,7 @@ private:
 	void _recycle_chunk_cb(HeightMapChunk *chunk);
 
 	void set_chunk_dirty(Point2i pos, int lod);
-	void update_chunk(HeightMapChunk & chunk, int lod);
+	void update_chunk(HeightMapChunk &chunk, int lod);
 
 	Point2i local_pos_to_cell(Vector3 local_pos) const;
 
@@ -58,13 +57,11 @@ private:
 	bool _collision_enabled;
 	HeightMapData _data;
 	HeightMapMesher _mesher;
-	QuadTreeLod<HeightMapChunk*> _lodder;
+	QuadTreeLod<HeightMapChunk *> _lodder;
 
 	// Pending chunk updates indexed by lod
 	// Note: needed Vector<HashSet<Point2i>> but HashSet doesn't exist so I use a placeholder bool.
-	Vector<HashMap<Point2i,bool> > _pending_chunk_updates;
+	Vector<HashMap<Point2i, bool> > _pending_chunk_updates;
 };
 
-
 #endif // HEIGHT_MAP_H
-

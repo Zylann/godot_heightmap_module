@@ -6,7 +6,4 @@ HeightMapBrushPanel::HeightMapBrushPanel() {
 }
 
 HeightMapBrushPanel::~HeightMapBrushPanel() {
-
 }
-
-

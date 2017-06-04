@@ -6,7 +6,6 @@
 #include <core/math/vector3.h>
 #include <core/variant.h>
 
-
 template <typename T>
 class QuadTreeLod {
 
@@ -22,7 +21,7 @@ private:
 
 		Node() {
 			chunk = T();
-			for(int i = 0; i < 4; ++i) {
+			for (int i = 0; i < 4; ++i) {
 				children[i] = NULL;
 			}
 		}
@@ -37,7 +36,7 @@ private:
 		}
 
 		void clear_children() {
-			if(has_children()) {
+			if (has_children()) {
 				for (int i = 0; i < 4; ++i) {
 					memdelete(children[i]);
 					children[i] = NULL;
@@ -93,7 +92,7 @@ public:
 	}
 
 	bool try_get_chunk_at(T &out_chunk, Point2i pos, int lod) {
-		HashMap<Point2i,T> &grid = _grids[lod];
+		HashMap<Point2i, T> &grid = _grids[lod];
 		T *chunk = grid.getptr(pos);
 		if (chunk) {
 			out_chunk = *chunk;
@@ -242,13 +241,13 @@ private:
 
 	void for_all_chunks_recursive(QueryFunc action_cb, void *callback_context, Node &node, int lod) {
 		ERR_FAIL_COND(lod < 0);
-		if(node.has_children()) {
-			for(int i = 0; i < 4; ++i) {
+		if (node.has_children()) {
+			for (int i = 0; i < 4; ++i) {
 				Node *child = node.children[i];
-				for_all_chunks_recursive(action_cb, callback_context, *child, lod -1);
+				for_all_chunks_recursive(action_cb, callback_context, *child, lod - 1);
 			}
 		} else {
-			if(node.chunk) {
+			if (node.chunk) {
 				action_cb(callback_context, node.chunk, node.origin, lod);
 			}
 		}

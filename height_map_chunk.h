@@ -24,9 +24,6 @@ private:
 private:
 	Node *_parent;
 	NodePath _mesh_instance_path;
-
 };
 
-
 #endif // HEIGHT_MAP_CHUNK_H
-

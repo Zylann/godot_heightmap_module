@@ -1,6 +1,6 @@
-#include <scene/gui/button_array.h>
-#include <scene/3d/camera.h>
 #include <core/os/input.h>
+#include <scene/3d/camera.h>
+#include <scene/gui/button_array.h>
 
 #include "height_map_editor_plugin.h"
 
@@ -38,7 +38,7 @@ HeightMapEditorPlugin::HeightMapEditorPlugin(EditorNode *p_editor) {
 	mode_tooltip[HeightMapBrush::MODE_TEXTURE] = TTR("Texture paint");
 
 	ButtonArray *mode_selector = memnew(ButtonArray);
-	for(int mode = 0; mode < HeightMapBrush::MODE_COUNT; ++mode) {
+	for (int mode = 0; mode < HeightMapBrush::MODE_COUNT; ++mode) {
 		// TODO Add localized tooltips
 		mode_selector->add_icon_button(mode_icons[mode], "", mode_tooltip[mode]);
 	}
@@ -58,33 +58,32 @@ bool HeightMapEditorPlugin::forward_spatial_gui_input(Camera *p_camera, const Re
 	Ref<InputEventMouseButton> mb_ref = p_event;
 	Ref<InputEventMouseMotion> mm_ref = p_event;
 
-	if(mb_ref.is_valid()) {
+	if (mb_ref.is_valid()) {
 		InputEventMouseButton &mb = **mb_ref;
 
-		if(mb.get_button_index() == BUTTON_LEFT || mb.get_button_index() == BUTTON_RIGHT) {
-			if(mb.is_pressed() == false)
+		if (mb.get_button_index() == BUTTON_LEFT || mb.get_button_index() == BUTTON_RIGHT) {
+			if (mb.is_pressed() == false)
 				_mouse_pressed = false;
 
 			// Need to check modifiers before capturing the event because they are used in navigation schemes
-			if(mb.get_control() == false && mb.get_alt() == false) {
-				if(mb.is_pressed())
+			if (mb.get_control() == false && mb.get_alt() == false) {
+				if (mb.is_pressed())
 					_mouse_pressed = true;
 				captured_event = true;
 
 				// TODO Prepare undo/redo
-
 			}
 		}
 
-	} else if(mm_ref.is_valid() && _mouse_pressed) {
+	} else if (mm_ref.is_valid() && _mouse_pressed) {
 		InputEventMouseMotion &mm = **mm_ref;
 		Input &input = *Input::get_singleton();
 
-		if(_brush.get_mode() == HeightMapBrush::MODE_ADD && input.is_mouse_button_pressed(BUTTON_RIGHT)) {
+		if (_brush.get_mode() == HeightMapBrush::MODE_ADD && input.is_mouse_button_pressed(BUTTON_RIGHT)) {
 			paint(*p_camera, mm.get_pos(), HeightMapBrush::MODE_SUBTRACT);
 			captured_event = true;
 
-		} else if(input.is_mouse_button_pressed(BUTTON_LEFT)) {
+		} else if (input.is_mouse_button_pressed(BUTTON_LEFT)) {
 			paint(*p_camera, mm.get_pos());
 			captured_event = true;
 		}
@@ -102,7 +101,7 @@ void HeightMapEditorPlugin::paint(Camera &camera, Vector2 screen_pos, int overri
 	HeightMap &height_map = *_height_map;
 
 	Point2i hit_pos_in_cells;
-	if(height_map.cell_raycast(origin, dir, hit_pos_in_cells)) {
+	if (height_map.cell_raycast(origin, dir, hit_pos_in_cells)) {
 		_brush.paint_world_pos(height_map, hit_pos_in_cells, override_mode);
 	}
 }
@@ -129,7 +128,3 @@ void HeightMapEditorPlugin::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("_on_mode_selected", "mode"), &HeightMapEditorPlugin::on_mode_selected);
 }
-
-
-
-

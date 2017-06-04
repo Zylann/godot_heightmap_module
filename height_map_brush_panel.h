@@ -3,14 +3,11 @@
 
 #include <scene/gui/control.h>
 
-
 class HeightMapBrushPanel : public Control {
 	GDCLASS(HeightMapBrushPanel, Control)
 public:
 	HeightMapBrushPanel();
 	~HeightMapBrushPanel();
-
 };
 
 #endif // HEIGHT_MAP_BRUSH_PANEL_H
-
