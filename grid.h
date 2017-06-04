@@ -22,7 +22,11 @@ public:
 	}
 
 	inline void set(Point2i pos, T v) {
-		_data[index(pos)] = v;
+		set(pos.x, pos.y, v);
+	}
+
+	inline void set(int x, int y, T v) {
+		_data[index(x,y)] = v;
 	}
 
 	inline T get_or_default(int x, int y) {
@@ -70,6 +74,9 @@ public:
 		int new_area = new_size.x * new_size.y;
 
 		if(preserve_data) {
+
+			// The following resizes the grid in place,
+			// so that it doesn't allocates more memory than needed.
 
 			if(old_size.x == new_size.x) {
 				// Column count didn't change, no need to offset any data
@@ -137,7 +144,7 @@ public:
 				}
 			}
 
-			// Fill new rows with default color
+			// Fill new rows with default value
 			for(int y = old_size.y; y < new_size.y; ++y) {
 				for(int x = 0; x < new_size.x; ++x) {
 					_data[x + y * new_size.x] = defval;

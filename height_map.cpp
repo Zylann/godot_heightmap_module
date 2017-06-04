@@ -115,6 +115,13 @@ void HeightMap::update_chunk(HeightMapChunk & chunk, int lod) {
 	mesher_params.size = Point2i(CHUNK_SIZE, CHUNK_SIZE);
 	mesher_params.smooth = true; // TODO Implement this option
 
+	if(mesher_params.smooth) {
+		Point2i cell_size = mesher_params.size;
+		cell_size.x <<= lod;
+		cell_size.y <<= lod;
+		_data.update_normals(chunk.cell_origin, cell_size);
+	}
+
 	Ref<Mesh> mesh = _mesher.make_chunk(mesher_params, _data);
 	chunk.set_mesh(mesh);
 
@@ -141,6 +148,16 @@ void HeightMap::set_chunk_dirty(Point2i pos, int lod) {
 	// Note: if the chunk has already been made dirty,
 	// nothing will change and the chunk will be updated only once when the update step comes.
 	pending_chunks[pos] = true;
+	// TODO Neighboring chunks might need an update too because of normals and seams being updated
+}
+
+void HeightMap::set_area_dirty(Point2i origin_in_cells, Point2i size_in_cells) {
+	Point2i cmin = origin_in_cells / CHUNK_SIZE;
+	Point2i csize = size_in_cells / CHUNK_SIZE + Point2i(1, 1);
+
+	// TODO take undo/redo into account here?
+
+	_lodder.for_chunks_in_rect(s_set_chunk_dirty_cb, cmin, csize, this);
 }
 
 void HeightMap::_recycle_chunk_cb(HeightMapChunk *chunk) {
@@ -148,17 +165,53 @@ void HeightMap::_recycle_chunk_cb(HeightMapChunk *chunk) {
 	memdelete(chunk);
 }
 
+Point2i HeightMap::local_pos_to_cell(Vector3 local_pos) const {
+	return Point2i(
+		static_cast<int>(local_pos.x),
+		static_cast<int>(local_pos.z));
+}
+
+bool HeightMap::cell_raycast(Vector3 origin_world, Vector3 dir_world, Point2i &out_cell_pos) {
+
+	Transform to_local = get_global_transform().affine_inverse();
+	Vector3 origin = to_local.xform(origin_world);
+	Vector3 dir = to_local.xform(dir_world);
+
+	if(origin.y < _data.heights.get_or_default(local_pos_to_cell(origin))) {
+		// Below
+		return false;
+	}
+
+	float unit = 1;
+	float d = 0;
+	const real_t max_distance = 800;
+	Vector3 pos = origin;
+
+	// Slow, but enough for edition
+	// TODO Could be optimized with a form of binary search
+	while(d < max_distance) {
+		pos += dir * unit;
+		if(_data.heights.get_or_default(local_pos_to_cell(pos)) > pos.y) {
+			out_cell_pos = local_pos_to_cell(pos - dir * unit);
+			return true;
+		}
+		d += unit;
+	}
+
+	return false;
+}
+
 void HeightMap::_bind_methods() {
 
 	// TODO API subject to change as the module heads to a more efficient implementation
 
 	ClassDB::bind_method(D_METHOD("get_material:Material"), &HeightMap::get_material);
-	ClassDB::bind_method(D_METHOD("set_material(material:Material)"), &HeightMap::set_material);
+	ClassDB::bind_method(D_METHOD("set_material", "material:Material"), &HeightMap::set_material);
 
 	ClassDB::bind_method(D_METHOD("is_collision_enabled"), &HeightMap::is_collision_enabled);
-	ClassDB::bind_method(D_METHOD("set_collision_enabled"), &HeightMap::set_collision_enabled);
+	ClassDB::bind_method(D_METHOD("set_collision_enabled", "enabled"), &HeightMap::set_collision_enabled);
 
-	ClassDB::bind_method(D_METHOD("set_resolution"), &HeightMap::set_resolution);
+	ClassDB::bind_method(D_METHOD("set_resolution", "resolution"), &HeightMap::set_resolution);
 	ClassDB::bind_method(D_METHOD("get_resolution"), &HeightMap::get_resolution);
 
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "material"), "set_material", "get_material");
@@ -176,6 +229,12 @@ HeightMapChunk *HeightMap::s_make_chunk_cb(void *context, Point2i origin, int lo
 void HeightMap::s_recycle_chunk_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod) {
 	HeightMap *self = reinterpret_cast<HeightMap*>(context);
 	self->_recycle_chunk_cb(chunk);
+}
+
+// static
+void HeightMap::s_set_chunk_dirty_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod) {
+	HeightMap *self = reinterpret_cast<HeightMap*>(context);
+	self->set_chunk_dirty(origin, lod);
 }
 
 // static

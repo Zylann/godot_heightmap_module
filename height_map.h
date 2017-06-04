@@ -28,6 +28,11 @@ public:
 	void set_resolution(int p_res);
 	int get_resolution() const;
 
+	void set_area_dirty(Point2i origin_in_cells, Point2i size_in_cells);
+	bool cell_raycast(Vector3 origin_world, Vector3 dir_world, Point2i &out_cell_pos);
+
+	HeightMapData &get_data() { return _data; }
+
 protected:
 	void _notification(int p_what);
 
@@ -39,10 +44,14 @@ private:
 	void set_chunk_dirty(Point2i pos, int lod);
 	void update_chunk(HeightMapChunk & chunk, int lod);
 
+	Point2i local_pos_to_cell(Vector3 local_pos) const;
+
 	static void _bind_methods();
+
 	static HeightMapChunk *s_make_chunk_cb(void *context, Point2i origin, int lod);
 	static void s_recycle_chunk_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
 	static void s_delete_chunk_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
+	static void s_set_chunk_dirty_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
 
 private:
 	Ref<Material> _material;
