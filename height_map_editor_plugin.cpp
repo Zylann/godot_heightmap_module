@@ -40,7 +40,9 @@ HeightMapEditorPlugin::HeightMapEditorPlugin(EditorNode *p_editor) {
 	ButtonArray *mode_selector = memnew(ButtonArray);
 	for (int mode = 0; mode < HeightMapBrush::MODE_COUNT; ++mode) {
 		// TODO Add localized tooltips
-		mode_selector->add_icon_button(mode_icons[mode], "", mode_tooltip[mode]);
+		// TODO Fix ButtonArray look so that we can use icons that have a visible pressed state!
+		//mode_selector->add_icon_button(mode_icons[mode], "", mode_tooltip[mode]);
+		mode_selector->add_button(mode_tooltip[mode], mode_tooltip[mode]);
 	}
 
 	mode_selector->connect("button_selected", this, "_on_mode_selected");
