@@ -16,6 +16,26 @@ void HeightMapData::update_normals(Point2i min, Point2i size) {
 	Point2i max = min + size;
 	Point2i pos;
 
+	if(min.x < 0)
+		min.x = 0;
+	if(min.y < 0)
+		min.y = 0;
+
+	if(min.x > normals.size().x)
+		min.x = normals.size().x;
+	if(min.y > normals.size().y)
+		min.y = normals.size().y;
+
+	if(max.x < 0)
+		max.x = 0;
+	if(max.y < 0)
+		max.y = 0;
+
+	if(max.x > normals.size().x)
+		max.x = normals.size().x;
+	if(max.y > normals.size().y)
+		max.y = normals.size().y;
+
 	for (pos.y = min.y; pos.y < max.y; ++pos.y) {
 		for (pos.x = min.x; pos.x < max.x; ++pos.x) {
 

@@ -118,7 +118,12 @@ void HeightMap::update_chunk(HeightMapChunk &chunk, int lod) {
 		Point2i cell_size = mesher_params.size;
 		cell_size.x <<= lod;
 		cell_size.y <<= lod;
-		_data.update_normals(chunk.cell_origin, cell_size);
+
+		// Padding is needed because normals are calculated using neighboring,
+		// so a change in height X also requires normals in X-1 and X+1 to be updated
+		Point2i pad(1,1);
+
+		_data.update_normals(chunk.cell_origin-pad, cell_size+2*pad);
 	}
 
 	Ref<Mesh> mesh = _mesher.make_chunk(mesher_params, _data);
