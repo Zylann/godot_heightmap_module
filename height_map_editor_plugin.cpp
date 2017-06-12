@@ -82,11 +82,11 @@ bool HeightMapEditorPlugin::forward_spatial_gui_input(Camera *p_camera, const Re
 		Input &input = *Input::get_singleton();
 
 		if (_brush.get_mode() == HeightMapBrush::MODE_ADD && input.is_mouse_button_pressed(BUTTON_RIGHT)) {
-			paint(*p_camera, mm.get_pos(), HeightMapBrush::MODE_SUBTRACT);
+			paint(*p_camera, mm.get_position(), HeightMapBrush::MODE_SUBTRACT);
 			captured_event = true;
 
 		} else if (input.is_mouse_button_pressed(BUTTON_LEFT)) {
-			paint(*p_camera, mm.get_pos());
+			paint(*p_camera, mm.get_position());
 			captured_event = true;
 		}
 	}

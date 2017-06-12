@@ -92,7 +92,7 @@ Ref<Mesh> HeightMapMesher::make_chunk(Params params, const HeightMapData &data) 
 	arrays[Mesh::ARRAY_COLOR] = pool_colors;
 	arrays[Mesh::ARRAY_INDEX] = pool_indices;
 
-	Ref<Mesh> mesh_ref(memnew(Mesh));
+	Ref<ArrayMesh> mesh_ref(memnew(ArrayMesh));
 	mesh_ref->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
 
 	return mesh_ref;
