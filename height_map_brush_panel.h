@@ -34,7 +34,6 @@ private:
 	Label *_opacity_label;
 	Slider *_opacity_slider;
 
-	Label *_height_label;
 	SpinBox *_height_edit;
 
 };

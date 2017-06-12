@@ -84,10 +84,6 @@ void HeightMapBrushPanel::on_param_changed(Variant value, int param) {
 		_opacity_label->set_text(String::num(value));
 		break;
 
-	case BRUSH_HEIGHT:
-		_height_label->set_text(String::num(value));
-		break;
-
 	default:
 		break;
 	}
