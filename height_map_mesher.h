@@ -18,6 +18,7 @@ public:
 
 		Params() {
 			smooth = true;
+			lod = 0;
 			for (int i = 0; i < 4; ++i)
 				seams[i] = 0;
 		}
@@ -29,7 +30,12 @@ private:
 	Vector<Vector3> _output_vertices;
 	Vector<Vector3> _output_normals;
 	Vector<Color> _output_colors;
-	//Vector<Vector2> uv;
+//	Vector<Vector2> _output_uv;
+//	Vector<Vector2> _output_uv2;
+//	Vector<float> _output_tangents;
+//	Vector<float> _output_bones;
+//	Vector<float> _output_weights;
+
 	Vector<int> _output_indices;
 };
 

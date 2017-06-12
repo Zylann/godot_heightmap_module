@@ -1,5 +1,7 @@
 #include "height_map_chunk.h"
 
+// TODO Use VisualServer directly
+
 HeightMapChunk::HeightMapChunk(Node *parent) {
 	_parent = parent;
 }
@@ -46,4 +48,10 @@ MeshInstance *HeightMapChunk::get_mesh_instance() {
 	if (n == NULL)
 		return NULL;
 	return n->cast_to<MeshInstance>();
+}
+
+void HeightMapChunk::set_material(Ref<Material> material) {
+	MeshInstance *mesh_instance = get_mesh_instance();
+	if(mesh_instance)
+		mesh_instance->set_material_override(material);
 }

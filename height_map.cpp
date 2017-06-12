@@ -9,16 +9,7 @@ HeightMap::HeightMap() {
 	_lodder.make_func = s_make_chunk_cb;
 	_lodder.recycle_func = s_recycle_chunk_cb;
 
-	// TODO TEST, WONT REMAIN HERE
 	set_resolution(DEFAULT_RESOLUTION);
-	Point2i size = _data.size();
-	Point2i pos;
-	for (pos.y = 0; pos.y < size.y; ++pos.y) {
-		for (pos.x = 0; pos.x < size.x; ++pos.x) {
-			float h = 2.0 * (Math::cos(pos.x * 0.2) + Math::sin(pos.y * 0.2));
-			_data.heights.set(pos, h);
-		}
-	}
 
 	_data.update_all_normals();
 
@@ -31,8 +22,10 @@ HeightMap::~HeightMap() {
 }
 
 void HeightMap::set_material(Ref<Material> p_material) {
-	_material = p_material;
-	// TODO Update chunks
+	if(_material != p_material) {
+		_material = p_material;
+		_lodder.for_all_chunks(s_set_material_cb, this);
+	}
 }
 
 void HeightMap::set_collision_enabled(bool enabled) {
@@ -60,12 +53,34 @@ int HeightMap::get_resolution() const {
 	return _data.size().x;
 }
 
+void HeightMap::set_lod_scale(float lod_scale) {
+	_lodder.set_split_scale(lod_scale);
+}
+
+float HeightMap::get_lod_scale() const {
+	return _lodder.get_split_scale();
+}
+
 void HeightMap::_notification(int p_what) {
 	switch (p_what) {
 
 		case NOTIFICATION_ENTER_TREE:
 			set_process(true);
 			break;
+
+		// TODO TEST, WONT REMAIN HERE
+		case NOTIFICATION_READY:
+		{
+			Point2i size = _data.size();
+			Point2i pos;
+			for (pos.y = 0; pos.y < size.y; ++pos.y) {
+				for (pos.x = 0; pos.x < size.x; ++pos.x) {
+					float h = 2.0 * (Math::cos(pos.x * 0.2) + Math::sin(pos.y * 0.2));
+					_data.heights.set(pos, h);
+				}
+			}
+		}
+		break;
 
 		case NOTIFICATION_PROCESS:
 			_process();
@@ -218,9 +233,13 @@ void HeightMap::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_resolution", "resolution"), &HeightMap::set_resolution);
 	ClassDB::bind_method(D_METHOD("get_resolution"), &HeightMap::get_resolution);
 
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "material"), "set_material", "get_material");
+	ClassDB::bind_method(D_METHOD("set_lod_scale", "scale"), &HeightMap::set_lod_scale);
+	ClassDB::bind_method(D_METHOD("get_lod_scale"), &HeightMap::get_lod_scale);
+
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "material", PROPERTY_HINT_RESOURCE_TYPE, "Material"), "set_material", "get_material");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "collision_enabled"), "set_collision_enabled", "is_collision_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "resolution"), "set_resolution", "get_resolution");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "lod_scale"), "set_lod_scale", "get_lod_scale");
 }
 
 // static
@@ -244,4 +263,10 @@ void HeightMap::s_set_chunk_dirty_cb(void *context, HeightMapChunk *chunk, Point
 // static
 void HeightMap::s_delete_chunk_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod) {
 	memdelete(chunk);
+}
+
+// static
+void HeightMap::s_set_material_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod) {
+	HeightMap *self = reinterpret_cast<HeightMap *>(context);
+	chunk->set_material(self->get_material());
 }

@@ -25,6 +25,7 @@ protected:
 
 private:
 	void on_mode_selected(int mode);
+	void on_brush_param_changed(Variant value, int param);
 	void paint(Camera &camera, Vector2 screen_pos, int override_mode = -1);
 
 private:

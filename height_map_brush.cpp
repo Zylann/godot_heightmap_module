@@ -6,6 +6,8 @@ HeightMapBrush::HeightMapBrush() {
 	_shape_sum = 0;
 	_mode = MODE_ADD;
 	_flatten_height = 0;
+	_texture_index = 0;
+	_color = Color(1,0,0,0);
 }
 
 void HeightMapBrush::set_mode(Mode mode) {
@@ -21,8 +23,26 @@ void HeightMapBrush::set_radius(int p_radius) {
 	}
 }
 
+void HeightMapBrush::set_opacity(float opacity) {
+	if(opacity < 0)
+		opacity = 0;
+	if(opacity > 1)
+		opacity = 1;
+	_opacity = opacity;
+}
+
 void HeightMapBrush::set_flatten_height(float flatten_height) {
 	_flatten_height = flatten_height;
+}
+
+void HeightMapBrush::set_texture_index(int tid) {
+	ERR_FAIL_COND(tid < 0);
+	_texture_index = tid;
+}
+
+void HeightMapBrush::set_color(Color c) {
+	// Color might be useful for custom shading
+	_color = c;
 }
 
 void HeightMapBrush::generate_procedural(int radius) {
@@ -75,6 +95,10 @@ void HeightMapBrush::paint_world_pos(HeightMap &height_map, Point2i cell_pos, in
 
 		case MODE_TEXTURE:
 			paint_indexed_texture(height_map, cell_pos);
+			break;
+
+		case MODE_COLOR:
+			paint_color(height_map, cell_pos);
 			break;
 
 		default:
@@ -143,6 +167,87 @@ struct OperatorLerp {
 	}
 };
 
+struct OperatorLerpColor {
+	Color target;
+	OperatorLerpColor(Color p_target)
+		: target(p_target) {}
+	void operator()(HeightMapData &data, Point2i pos, float v) {
+		data.colors.set(pos, data.colors.get(pos).linear_interpolate(target, v));
+	}
+};
+
+struct OperatorIndexedTexture {
+
+	int texture_index;
+
+	OperatorIndexedTexture(int p_texture_index):texture_index(p_texture_index){}
+
+	void operator()(HeightMapData &data, Point2i pos, float v) {
+
+		// TODO There is potential for bad blending using this local algorithm,
+		// neighbors should be taken into account I think
+
+		int loc = data.texture_weights[0].index(pos);
+
+		int slot_index = -1;
+
+		// Find if the texture already has a slot
+		for(int i = 0; i < HeightMapData::TEXTURE_INDEX_COUNT; ++i) {
+			if(data.texture_indices[slot_index][loc] == texture_index) {
+				slot_index = i;
+				break;
+			}
+		}
+
+		if(slot_index == -1) {
+			// Need to assign a slot to the texture
+
+			// Find the lowest weight
+			float lowest_weight = 2;
+			for(int i = 0; i < HeightMapData::TEXTURE_INDEX_COUNT; ++i) {
+				float w = data.texture_weights[i][loc];
+				if(w < lowest_weight) {
+					lowest_weight = w;
+					slot_index = i;
+				}
+			}
+
+			// Replace old weight by new one
+			data.texture_indices[slot_index][loc] = texture_index;
+			data.texture_weights[slot_index][loc] = 0;
+		}
+
+		// Weights sum should always initially be 1
+		float weight_sum = 1;
+
+		// Exclude the slot we are modifying
+		weight_sum -= data.texture_weights[slot_index][loc];
+
+		// Modify slot's weight
+		float w = data.texture_weights[slot_index][loc];
+		w = Math::lerp(w, 1, v);
+		data.texture_weights[slot_index][loc] = w;
+
+		// Make sure the other slots give a sum of 1
+		float k = 0;
+		if(weight_sum > 0.01)
+			k = (1.f - w) / weight_sum;
+		for(int i = 0; i < HeightMapData::TEXTURE_INDEX_COUNT; ++i) {
+			if(i != slot_index)
+				data.texture_weights[i][loc] *= k;
+		}
+
+		// Debug check:
+		// Really make sure weights sum is 1
+		weight_sum = 0;
+		for(int i = 0; i < HeightMapData::TEXTURE_INDEX_COUNT; ++i) {
+			weight_sum += data.texture_weights[i][loc];
+		}
+		if(weight_sum > 1.001)
+			print_line(String("Sum is above 1: {0}").format(varray(weight_sum)));
+	}
+};
+
 void HeightMapBrush::paint_height(HeightMap &height_map, Point2i cell_pos, float speed) {
 	OperatorAdd op;
 	foreach_xy(op, height_map, cell_pos, speed, _opacity, _shape);
@@ -163,7 +268,9 @@ void HeightMapBrush::flatten_height(HeightMap &height_map, Point2i cell_pos) {
 
 void HeightMapBrush::paint_indexed_texture(HeightMap &height_map, Point2i cell_pos) {
 
-	// TODO Implement texture paint using blend indices
+	OperatorIndexedTexture op(_texture_index);
+	foreach_xy(op, height_map, cell_pos, 1, _opacity, _shape);
+
 	// TODO Implement texture arrays or 3D textures in shaders so that we can see the result
 
 	// The idea is that, in a fragment shader, we can do this for a cheap cost and any number of textures:
@@ -190,3 +297,10 @@ void HeightMapBrush::paint_indexed_texture(HeightMap &height_map, Point2i cell_p
 	// but to handle transitions correctly there should be at least 4 slots.
 	// Then this information will be translated into vertices at meshing time.
 }
+
+void HeightMapBrush::paint_color(HeightMap &height_map, Point2i cell_pos) {
+	OperatorLerpColor op(_color);
+	foreach_xy(op, height_map, cell_pos, 1, _opacity, _shape);
+}
+
+

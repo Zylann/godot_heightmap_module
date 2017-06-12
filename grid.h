@@ -21,6 +21,14 @@ public:
 		return _data[index(x, y)];
 	}
 
+	inline T operator[](int i) const {
+		return _data[i];
+	}
+
+	inline T &operator[](int i) {
+		return _data[i];
+	}
+
 	inline void set(Point2i pos, T v) {
 		set(pos.x, pos.y, v);
 	}

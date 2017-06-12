@@ -14,11 +14,11 @@ public:
 	void create(Point2i pos, Ref<Material> material);
 	void set_mesh(Ref<Mesh> mesh);
 	void clear();
-
-	//void clear();
+	void set_material(Ref<Material> material);
 
 private:
-	// TODO In the future it won't rely on nodes anymore
+	// TODO In the future it won't rely on nodes anymore,
+	// you shouldn't assume chunks use nodes so it's private
 	MeshInstance *get_mesh_instance();
 
 private:

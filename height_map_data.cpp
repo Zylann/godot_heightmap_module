@@ -1,10 +1,17 @@
 #include "height_map.h"
 
 void HeightMapData::resize(int p_size) {
+
 	Point2i size(p_size, p_size);
 	heights.resize(size, true, 0);
 	normals.resize(size, true, Vector3(0, 1, 0));
 	colors.resize(size, true, Color(1, 1, 1, 1));
+
+	for(int i = 0; i < TEXTURE_INDEX_COUNT; ++i) {
+		// Sum of all weights must be 1, so we fill first slots with 1 and others with 0
+		texture_weights[i].resize(size, true, i == 0 ? 1 : 0);
+		texture_indices[i].resize(size, true, 0);
+	}
 }
 
 void HeightMapData::update_all_normals() {

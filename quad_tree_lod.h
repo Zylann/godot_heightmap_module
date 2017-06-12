@@ -16,7 +16,8 @@ private:
 
 		// Userdata.
 		// Note: the tree doesn't own this field,
-		// if it's a pointer make sure you free it when you don't need it anymore
+		// if it's a pointer make sure you free it when you don't need it anymore,
+		// using the recycling callback
 		T chunk;
 
 		Node() {
@@ -64,6 +65,7 @@ public:
 		callbacks_context = NULL;
 		make_func = NULL;
 		recycle_func = NULL;
+		_split_scale = 2;
 	}
 
 	//~QuadTreeLod() {}
@@ -91,6 +93,26 @@ public:
 		return _max_depth;
 	}
 
+	// The higher, the longer LODs will spread and higher the quality.
+	// The lower, the shorter LODs will spread and lower the quality.
+	void set_split_scale(float p_split_scale) {
+		const float min = 2.0;
+		const float max = 5.0;
+
+		// Split scale must be greater than a threshold,
+		// otherwise lods will decimate too fast and it will look messy
+		if(p_split_scale < min)
+			p_split_scale = min;
+		if(p_split_scale > max)
+			p_split_scale = max;
+
+		_split_scale = p_split_scale;
+	}
+
+	inline float get_split_scale() const {
+		return _split_scale;
+	}
+
 	bool try_get_chunk_at(T &out_chunk, Point2i pos, int lod) {
 		HashMap<Point2i, T> &grid = _grids[lod];
 		T *chunk = grid.getptr(pos);
@@ -111,7 +133,7 @@ public:
 	}
 
 	inline int get_split_distance(int lod) const {
-		return _base_size * get_lod_size(lod) * 2.0;
+		return _base_size * get_lod_size(lod) * _split_scale;
 	}
 
 	void for_all_chunks(QueryFunc action_cb, void *callback_context) {
@@ -258,6 +280,7 @@ private:
 	Vector<HashMap<Point2i, T> > _grids;
 	int _max_depth;
 	int _base_size;
+	float _split_scale;
 };
 
 #endif // QUAD_TREE_LOD_H

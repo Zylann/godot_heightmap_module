@@ -27,6 +27,9 @@ public:
 	void set_resolution(int p_res);
 	int get_resolution() const;
 
+	void set_lod_scale(float lod_scale);
+	float get_lod_scale() const;
+
 	void set_area_dirty(Point2i origin_in_cells, Point2i size_in_cells);
 	bool cell_raycast(Vector3 origin_world, Vector3 dir_world, Point2i &out_cell_pos);
 
@@ -51,6 +54,7 @@ private:
 	static void s_recycle_chunk_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
 	static void s_delete_chunk_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
 	static void s_set_chunk_dirty_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
+	static void s_set_material_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
 
 private:
 	Ref<Material> _material;
