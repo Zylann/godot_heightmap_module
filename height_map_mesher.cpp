@@ -51,7 +51,7 @@ Ref<Mesh> HeightMapMesher::make_chunk(Params params, const HeightMapData &data) 
 	for (pos.y = params.origin.y; pos.y <= max.y; pos.y += stride) {
 		for (pos.x = params.origin.x; pos.x <= max.x; pos.x += stride) {
 
-			int loc = data.normals.index(pos);
+			int loc = data.heights.index(pos);
 
 			_output_vertices.push_back(Vector3(
 					pos.x - params.origin.x,
