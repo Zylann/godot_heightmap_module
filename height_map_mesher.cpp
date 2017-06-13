@@ -18,11 +18,11 @@ Ref<Mesh> HeightMapMesher::make_chunk(Params params, const HeightMapData &data) 
 	_output_vertices.clear();
 	_output_normals.clear();
 	_output_colors.clear();
-//	_output_uv.clear();
-//	_output_uv2.clear();
-//	_output_bones.clear();
-//	_output_tangents.clear();
-//	_output_weights.clear();
+	//	_output_uv.clear();
+	//	_output_uv2.clear();
+	//	_output_bones.clear();
+	//	_output_tangents.clear();
+	//	_output_weights.clear();
 	_output_indices.clear();
 
 	if (!params.smooth) {
@@ -63,9 +63,9 @@ Ref<Mesh> HeightMapMesher::make_chunk(Params params, const HeightMapData &data) 
 			_output_normals.push_back(data.normals[loc]);
 
 			// Texture arrays
-//			_output_uv.push_back(Vector2(data.texture_indices[0][loc], data.texture_indices[1][loc]));
-//			_output_uv2.push_back(Vector2(data.texture_indices[2][loc], data.texture_indices[3][loc]));
-//			_output_colors.push_back(Color(data.texture_weights[0][loc], data.texture_weights[1][loc], data.texture_weights[2][loc], data.texture_weights[3][loc]));
+			//			_output_uv.push_back(Vector2(data.texture_indices[0][loc], data.texture_indices[1][loc]));
+			//			_output_uv2.push_back(Vector2(data.texture_indices[2][loc], data.texture_indices[3][loc]));
+			//			_output_colors.push_back(Color(data.texture_weights[0][loc], data.texture_weights[1][loc], data.texture_weights[2][loc], data.texture_weights[3][loc]));
 			// Err... no more attributes??
 		}
 	}

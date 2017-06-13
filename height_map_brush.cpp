@@ -7,7 +7,7 @@ HeightMapBrush::HeightMapBrush() {
 	_mode = MODE_ADD;
 	_flatten_height = 0;
 	_texture_index = 0;
-	_color = Color(1,0,0,0);
+	_color = Color(1, 0, 0, 0);
 }
 
 void HeightMapBrush::set_mode(Mode mode) {
@@ -24,9 +24,9 @@ void HeightMapBrush::set_radius(int p_radius) {
 }
 
 void HeightMapBrush::set_opacity(float opacity) {
-	if(opacity < 0)
+	if (opacity < 0)
 		opacity = 0;
-	if(opacity > 1)
+	if (opacity > 1)
 		opacity = 1;
 	_opacity = opacity;
 }
@@ -66,7 +66,7 @@ void HeightMapBrush::generate_procedural(int radius) {
 	}
 }
 
-void HeightMapBrush::paint_world_pos(HeightMap &height_map, Point2i cell_pos, int override_mode) {
+void HeightMapBrush::paint(HeightMap &height_map, Point2i cell_pos, int override_mode) {
 
 	float delta = _opacity * 1.f / 60.f;
 	Mode mode = _mode;
@@ -180,7 +180,8 @@ struct OperatorIndexedTexture {
 
 	int texture_index;
 
-	OperatorIndexedTexture(int p_texture_index):texture_index(p_texture_index){}
+	OperatorIndexedTexture(int p_texture_index)
+		: texture_index(p_texture_index) {}
 
 	void operator()(HeightMapData &data, Point2i pos, float v) {
 
@@ -192,21 +193,21 @@ struct OperatorIndexedTexture {
 		int slot_index = -1;
 
 		// Find if the texture already has a slot
-		for(int i = 0; i < HeightMapData::TEXTURE_INDEX_COUNT; ++i) {
-			if(data.texture_indices[slot_index][loc] == texture_index) {
+		for (int i = 0; i < HeightMapData::TEXTURE_INDEX_COUNT; ++i) {
+			if (data.texture_indices[slot_index][loc] == texture_index) {
 				slot_index = i;
 				break;
 			}
 		}
 
-		if(slot_index == -1) {
+		if (slot_index == -1) {
 			// Need to assign a slot to the texture
 
 			// Find the lowest weight
 			float lowest_weight = 2;
-			for(int i = 0; i < HeightMapData::TEXTURE_INDEX_COUNT; ++i) {
+			for (int i = 0; i < HeightMapData::TEXTURE_INDEX_COUNT; ++i) {
 				float w = data.texture_weights[i][loc];
-				if(w < lowest_weight) {
+				if (w < lowest_weight) {
 					lowest_weight = w;
 					slot_index = i;
 				}
@@ -230,20 +231,20 @@ struct OperatorIndexedTexture {
 
 		// Make sure the other slots give a sum of 1
 		float k = 0;
-		if(weight_sum > 0.01)
+		if (weight_sum > 0.01)
 			k = (1.f - w) / weight_sum;
-		for(int i = 0; i < HeightMapData::TEXTURE_INDEX_COUNT; ++i) {
-			if(i != slot_index)
+		for (int i = 0; i < HeightMapData::TEXTURE_INDEX_COUNT; ++i) {
+			if (i != slot_index)
 				data.texture_weights[i][loc] *= k;
 		}
 
 		// Debug check:
 		// Really make sure weights sum is 1
 		weight_sum = 0;
-		for(int i = 0; i < HeightMapData::TEXTURE_INDEX_COUNT; ++i) {
+		for (int i = 0; i < HeightMapData::TEXTURE_INDEX_COUNT; ++i) {
 			weight_sum += data.texture_weights[i][loc];
 		}
-		if(weight_sum > 1.001)
+		if (weight_sum > 1.001)
 			print_line(String("Sum is above 1: {0}").format(varray(weight_sum)));
 	}
 };
@@ -282,10 +283,10 @@ void HeightMapBrush::paint_indexed_texture(HeightMap &height_map, Point2i cell_p
 
 	// or
 
-	// c += textureArray(s, uv.xy, int(indices.x)) * weigths.x;
-	// c += textureArray(s, uv.xy, int(indices.y)) * weigths.y;
-	// c += textureArray(s, uv.xy, int(indices.z)) * weigths.z;
-	// c += textureArray(s, uv.xy, int(indices.w)) * weigths.w;
+	// c += textureArray(s, vec3(uv.xy, indices.x)) * weigths.x;
+	// c += textureArray(s, vec3(uv.xy, indices.y)) * weigths.y;
+	// c += textureArray(s, vec3(uv.xy, indices.z)) * weigths.z;
+	// c += textureArray(s, vec3(uv.xy, indices.w)) * weigths.w;
 
 	// Note: binary combination of 16 textures works too but the method above is more efficient and scalable in GLES3
 
@@ -302,5 +303,3 @@ void HeightMapBrush::paint_color(HeightMap &height_map, Point2i cell_pos) {
 	OperatorLerpColor op(_color);
 	foreach_xy(op, height_map, cell_pos, 1, _opacity, _shape);
 }
-
-

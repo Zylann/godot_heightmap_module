@@ -70,4 +70,3 @@ void HeightMapChunk::set_visible(bool visible) {
 	VisualServer &vs = *VisualServer::get_singleton();
 	vs.instance_set_visible(_mesh_instance, visible);
 }
-

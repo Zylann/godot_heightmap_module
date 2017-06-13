@@ -11,7 +11,6 @@ static void s_exit_world_cb(void *context, HeightMapChunk *chunk, Point2i origin
 static void s_transform_changed_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
 static void s_visibility_changed_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
 
-
 HeightMap::HeightMap() {
 	set_notify_transform(true);
 
@@ -33,7 +32,7 @@ HeightMap::~HeightMap() {
 }
 
 void HeightMap::set_material(Ref<Material> p_material) {
-	if(_material != p_material) {
+	if (_material != p_material) {
 		_material = p_material;
 		_lodder.for_all_chunks(s_set_material_cb, this);
 	}
@@ -52,7 +51,7 @@ void HeightMap::set_resolution(int p_res) {
 	// Power of two is important for LOD.
 	// Also, grid data is off by one,
 	// because for an even number of quads you need an odd number of vertices
-	p_res = nearest_power_of_2(p_res-1) + 1;
+	p_res = nearest_power_of_2(p_res - 1) + 1;
 
 	if (p_res != get_resolution()) {
 		_data.resize(p_res);
@@ -99,8 +98,7 @@ void HeightMap::_notification(int p_what) {
 		} break;
 
 		// TODO TEST, WONT REMAIN HERE
-		case NOTIFICATION_READY:
-		{
+		case NOTIFICATION_READY: {
 			Point2i size = _data.size();
 			Point2i pos;
 			for (pos.y = 0; pos.y < size.y; ++pos.y) {
@@ -109,8 +107,7 @@ void HeightMap::_notification(int p_what) {
 					_data.heights.set(pos, h);
 				}
 			}
-		}
-		break;
+		} break;
 
 		case NOTIFICATION_PROCESS:
 			_process();
@@ -166,9 +163,9 @@ void HeightMap::update_chunk(HeightMapChunk &chunk, int lod) {
 
 		// Padding is needed because normals are calculated using neighboring,
 		// so a change in height X also requires normals in X-1 and X+1 to be updated
-		Point2i pad(1,1);
+		Point2i pad(1, 1);
 
-		_data.update_normals(chunk.cell_origin-pad, cell_size+2*pad);
+		_data.update_normals(chunk.cell_origin - pad, cell_size + 2 * pad);
 	}
 
 	Ref<Mesh> mesh = _mesher.make_chunk(mesher_params, _data);
@@ -304,12 +301,11 @@ void s_exit_world_cb(void *context, HeightMapChunk *chunk, Point2i origin, int l
 }
 
 void s_transform_changed_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod) {
-	Transform *transform = reinterpret_cast<Transform*>(context);
+	Transform *transform = reinterpret_cast<Transform *>(context);
 	chunk->parent_transform_changed(*transform);
 }
 
 void s_visibility_changed_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod) {
-	bool *visible = reinterpret_cast<bool*>(context);
+	bool *visible = reinterpret_cast<bool *>(context);
 	chunk->set_visible(*visible);
 }
-

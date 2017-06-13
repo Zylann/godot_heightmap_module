@@ -75,17 +75,17 @@ void HeightMapBrushPanel::init_params(int size, float opacity, float height) {
 
 void HeightMapBrushPanel::on_param_changed(Variant value, int param) {
 
-	switch(param) {
-	case BRUSH_SIZE:
-		_size_label->set_text(String::num(value));
-		break;
+	switch (param) {
+		case BRUSH_SIZE:
+			_size_label->set_text(String::num(value));
+			break;
 
-	case BRUSH_OPACITY:
-		_opacity_label->set_text(String::num(value));
-		break;
+		case BRUSH_OPACITY:
+			_opacity_label->set_text(String::num(value));
+			break;
 
-	default:
-		break;
+		default:
+			break;
 	}
 
 	emit_signal(PARAM_CHANGED, value, param);
@@ -97,5 +97,3 @@ void HeightMapBrushPanel::_bind_methods() {
 
 	ADD_SIGNAL(MethodInfo(PARAM_CHANGED));
 }
-
-

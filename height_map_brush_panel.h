@@ -35,7 +35,6 @@ private:
 	Slider *_opacity_slider;
 
 	SpinBox *_height_edit;
-
 };
 
 #endif // HEIGHT_MAP_BRUSH_PANEL_H

@@ -101,9 +101,9 @@ public:
 
 		// Split scale must be greater than a threshold,
 		// otherwise lods will decimate too fast and it will look messy
-		if(p_split_scale < min)
+		if (p_split_scale < min)
 			p_split_scale = min;
-		if(p_split_scale > max)
+		if (p_split_scale > max)
 			p_split_scale = max;
 
 		_split_scale = p_split_scale;

@@ -17,9 +17,9 @@ HeightMapEditorPlugin::HeightMapEditorPlugin(EditorNode *p_editor) {
 	_brush_panel = memnew(HeightMapBrushPanel);
 	_brush_panel->connect(HeightMapBrushPanel::PARAM_CHANGED, this, "_on_brush_param_changed");
 	_brush_panel->init_params(
-				_brush.get_radius(),
-				_brush.get_opacity(),
-				_brush.get_flatten_height());
+			_brush.get_radius(),
+			_brush.get_opacity(),
+			_brush.get_flatten_height());
 	add_control_to_container(CONTAINER_SPATIAL_EDITOR_BOTTOM, _brush_panel);
 	_brush_panel->hide();
 
@@ -109,7 +109,7 @@ void HeightMapEditorPlugin::paint(Camera &camera, Vector2 screen_pos, int overri
 
 	Point2i hit_pos_in_cells;
 	if (height_map.cell_raycast(origin, dir, hit_pos_in_cells)) {
-		_brush.paint_world_pos(height_map, hit_pos_in_cells, override_mode);
+		_brush.paint(height_map, hit_pos_in_cells, override_mode);
 	}
 }
 
@@ -133,22 +133,22 @@ void HeightMapEditorPlugin::on_mode_selected(int mode) {
 
 void HeightMapEditorPlugin::on_brush_param_changed(Variant value, int param) {
 
-	switch(param) {
-	case HeightMapBrushPanel::BRUSH_SIZE:
-		_brush.set_radius(value);
-		break;
+	switch (param) {
+		case HeightMapBrushPanel::BRUSH_SIZE:
+			_brush.set_radius(value);
+			break;
 
-	case HeightMapBrushPanel::BRUSH_OPACITY:
-		_brush.set_opacity(value);
-		break;
+		case HeightMapBrushPanel::BRUSH_OPACITY:
+			_brush.set_opacity(value);
+			break;
 
-	case HeightMapBrushPanel::BRUSH_HEIGHT:
-		_brush.set_flatten_height(value);
-		break;
+		case HeightMapBrushPanel::BRUSH_HEIGHT:
+			_brush.set_flatten_height(value);
+			break;
 
-	default:
-		ERR_PRINT("Unknown parameter");
-		break;
+		default:
+			ERR_PRINT("Unknown parameter");
+			break;
 	}
 }
 
