@@ -1,57 +1,73 @@
 #include "height_map_chunk.h"
 
-// TODO Use VisualServer directly
-
-HeightMapChunk::HeightMapChunk(Node *parent) {
-	_parent = parent;
-}
-
-void HeightMapChunk::create(Point2i cell_pos, Ref<Material> material) {
+HeightMapChunk::HeightMapChunk(Spatial *parent, Point2i cell_pos, Ref<Material> material) {
 	cell_origin = cell_pos;
 
-	MeshInstance *mesh_instance = get_mesh_instance();
-	if (mesh_instance == NULL) {
-		mesh_instance = memnew(MeshInstance);
-	}
+	VisualServer &vs = *VisualServer::get_singleton();
 
-	//mesh_instance.set_name("chunk_" + str(x) + "_" + str(y))
-	mesh_instance->set_translation(Vector3(cell_pos.x, 0, cell_pos.y));
+	_mesh_instance = vs.instance_create();
+
+	parent_transform_changed(parent->get_global_transform());
+
 	if (material.is_valid()) {
-		mesh_instance->set_material_override(material);
+		vs.instance_geometry_set_material_override(_mesh_instance, material->get_rid());
 	}
 
-	mesh_instance->show();
-	if (mesh_instance->is_inside_tree() == false) {
-		_parent->add_child(mesh_instance);
-		_mesh_instance_path = mesh_instance->get_path();
+	Ref<World> world = parent->get_world();
+	if (world.is_valid()) {
+		vs.instance_set_scenario(_mesh_instance, world->get_scenario());
 	}
+
+	// TODO Is this needed?
+	vs.instance_set_visible(_mesh_instance, true);
 }
 
-void HeightMapChunk::clear() {
-	MeshInstance *mesh_instance = get_mesh_instance();
-	if (mesh_instance)
-		mesh_instance->queue_delete();
+HeightMapChunk::~HeightMapChunk() {
+	VisualServer &vs = *VisualServer::get_singleton();
+	if (_mesh_instance.is_valid()) {
+		vs.free(_mesh_instance);
+		_mesh_instance = RID();
+	}
 	//	if(collider)
 	//		collider->queue_delete();
 }
 
-void HeightMapChunk::set_mesh(Ref<Mesh> mesh) {
-	MeshInstance *mesh_instance = get_mesh_instance();
-	if (mesh_instance)
-		mesh_instance->set_mesh(mesh);
+void HeightMapChunk::enter_world(World &world) {
+	ERR_FAIL_COND(_mesh_instance.is_valid() == false);
+	VisualServer &vs = *VisualServer::get_singleton();
+	vs.instance_set_scenario(_mesh_instance, world.get_scenario());
 }
 
-MeshInstance *HeightMapChunk::get_mesh_instance() {
-	if (_mesh_instance_path.is_empty())
-		return NULL;
-	Node *n = _parent->get_node(_mesh_instance_path);
-	if (n == NULL)
-		return NULL;
-	return n->cast_to<MeshInstance>();
+void HeightMapChunk::exit_world() {
+	ERR_FAIL_COND(_mesh_instance.is_valid() == false);
+	VisualServer &vs = *VisualServer::get_singleton();
+	vs.instance_set_scenario(_mesh_instance, RID());
+}
+
+void HeightMapChunk::parent_transform_changed(const Transform &parent_transform) {
+	ERR_FAIL_COND(_mesh_instance.is_valid() == false);
+	VisualServer &vs = *VisualServer::get_singleton();
+	Transform local_transform(Basis(), Vector3(cell_origin.x, 0, cell_origin.y));
+	Transform world_transform = parent_transform * local_transform;
+	vs.instance_set_transform(_mesh_instance, world_transform);
+}
+
+void HeightMapChunk::set_mesh(Ref<Mesh> mesh) {
+	ERR_FAIL_COND(_mesh_instance.is_valid() == false);
+	VisualServer &vs = *VisualServer::get_singleton();
+	vs.instance_set_base(_mesh_instance, mesh.is_valid() ? mesh->get_rid() : RID());
+	_mesh = mesh;
 }
 
 void HeightMapChunk::set_material(Ref<Material> material) {
-	MeshInstance *mesh_instance = get_mesh_instance();
-	if(mesh_instance)
-		mesh_instance->set_material_override(material);
+	ERR_FAIL_COND(_mesh_instance.is_valid() == false);
+	VisualServer &vs = *VisualServer::get_singleton();
+	vs.instance_geometry_set_material_override(_mesh_instance, material.is_valid() ? material->get_rid() : RID());
 }
+
+void HeightMapChunk::set_visible(bool visible) {
+	ERR_FAIL_COND(_mesh_instance.is_valid() == false);
+	VisualServer &vs = *VisualServer::get_singleton();
+	vs.instance_set_visible(_mesh_instance, visible);
+}
+

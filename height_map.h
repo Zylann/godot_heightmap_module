@@ -52,9 +52,7 @@ private:
 
 	static HeightMapChunk *s_make_chunk_cb(void *context, Point2i origin, int lod);
 	static void s_recycle_chunk_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
-	static void s_delete_chunk_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
 	static void s_set_chunk_dirty_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
-	static void s_set_material_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
 
 private:
 	Ref<Material> _material;

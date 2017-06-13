@@ -9,21 +9,22 @@ class HeightMapChunk {
 public:
 	Point2i cell_origin;
 
-	HeightMapChunk(Node *parent);
+	HeightMapChunk(Spatial *parent, Point2i cell_pos, Ref<Material> material);
+	~HeightMapChunk();
 
 	void create(Point2i pos, Ref<Material> material);
 	void set_mesh(Ref<Mesh> mesh);
 	void clear();
 	void set_material(Ref<Material> material);
+	void enter_world(World &world);
+	void exit_world();
+	void parent_transform_changed(const Transform &parent_transform);
+	void set_visible(bool visible);
 
 private:
-	// TODO In the future it won't rely on nodes anymore,
-	// you shouldn't assume chunks use nodes so it's private
-	MeshInstance *get_mesh_instance();
-
-private:
-	Node *_parent;
-	NodePath _mesh_instance_path;
+	RID _mesh_instance;
+	// Need to keep a reference so that the mesh RID doesn't get freed
+	Ref<Mesh> _mesh;
 };
 
 #endif // HEIGHT_MAP_CHUNK_H
