@@ -65,7 +65,7 @@ public:
 		callbacks_context = NULL;
 		make_func = NULL;
 		recycle_func = NULL;
-		_split_scale = 2;
+		_split_scale = 3;
 	}
 
 	//~QuadTreeLod() {}
