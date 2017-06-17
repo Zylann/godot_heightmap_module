@@ -1,6 +1,5 @@
 #include <core/os/input.h>
 #include <scene/3d/camera.h>
-#include <scene/gui/button_array.h>
 
 #include "height_map_editor_plugin.h"
 
@@ -41,18 +40,29 @@ HeightMapEditorPlugin::HeightMapEditorPlugin(EditorNode *p_editor) {
 	mode_tooltip[HeightMapBrush::MODE_SMOOTH] = TTR("Smooth");
 	mode_tooltip[HeightMapBrush::MODE_FLATTEN] = TTR("Flatten");
 	mode_tooltip[HeightMapBrush::MODE_TEXTURE] = TTR("Texture paint");
+	mode_tooltip[HeightMapBrush::MODE_COLOR] = TTR("Color paint");
 
-	ButtonArray *mode_selector = memnew(ButtonArray);
+	_toolbar->add_child(memnew(VSeparator));
+
+	Ref<ButtonGroup> mode_group_ref = Ref<ButtonGroup>(memnew(ButtonGroup));
+
 	for (int mode = 0; mode < HeightMapBrush::MODE_COUNT; ++mode) {
 		// TODO Add localized tooltips
 		// TODO Fix ButtonArray look so that we can use icons that have a visible pressed state!
-		//mode_selector->add_icon_button(mode_icons[mode], "", mode_tooltip[mode]);
-		mode_selector->add_button(mode_tooltip[mode], mode_tooltip[mode]);
+		ToolButton *button = memnew(ToolButton);
+		button->set_icon(mode_icons[mode]);
+		button->set_text(mode_tooltip[mode]);
+		button->set_tooltip(mode_tooltip[mode]);
+		button->set_toggle_mode(true);
+		button->set_button_group(mode_group_ref);
+
+		if(mode == _brush.get_mode()) {
+			button->set_pressed(true);
+		}
+
+		button->connect("pressed", this, "_on_mode_selected", varray(mode));
+		_toolbar->add_child(button);
 	}
-
-	mode_selector->connect("button_selected", this, "_on_mode_selected");
-
-	_toolbar->add_child(mode_selector);
 }
 
 HeightMapEditorPlugin::~HeightMapEditorPlugin() {
