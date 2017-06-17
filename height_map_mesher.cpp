@@ -78,12 +78,50 @@ Ref<Mesh> HeightMapMesher::make_chunk(Params params, const HeightMapData &data) 
 	int i = 0;
 	for (pos.y = 0; pos.y < params.size.y; ++pos.y) {
 		for (pos.x = 0; pos.x < params.size.x; ++pos.x) {
-			_output_indices.push_back(i);
-			_output_indices.push_back(i + params.size.x + 2);
-			_output_indices.push_back(i + params.size.x + 1);
-			_output_indices.push_back(i);
-			_output_indices.push_back(i + 1);
-			_output_indices.push_back(i + params.size.x + 2);
+
+			int i00 = i;
+			int i10 = i + 1;
+			int i01 = i + params.size.x + 1;
+			int i11 = i01 + 1;
+
+			float h00 = _output_vertices[i00].y;
+			float h10 = _output_vertices[i10].y;
+			float h01 = _output_vertices[i01].y;
+			float h11 = _output_vertices[i11].y;
+
+			// Put the diagonal between vertices that have the less height differences
+			bool flip = Math::abs(h10 - h01) < Math::abs(h11 - h00);
+
+			if(flip) {
+
+				// 01---11
+				//  |\  |
+				//  | \ |
+				//  |  \|
+				// 00---10
+
+				_output_indices.push_back( i00 );
+				_output_indices.push_back( i10 );
+				_output_indices.push_back( i01 );
+				_output_indices.push_back( i10 );
+				_output_indices.push_back( i11 );
+				_output_indices.push_back( i01 );
+
+			} else {
+
+				// 01---11
+				//  |  /|
+				//  | / |
+				//  |/  |
+				// 00---10
+
+				_output_indices.push_back( i00 );
+				_output_indices.push_back( i11 );
+				_output_indices.push_back( i01 );
+				_output_indices.push_back( i00 );
+				_output_indices.push_back( i10 );
+				_output_indices.push_back( i11 );
+			}
 			++i;
 		}
 		++i;
