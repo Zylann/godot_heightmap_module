@@ -18,22 +18,20 @@ public:
 	HeightMap();
 	~HeightMap();
 
+	void set_data(Ref<HeightMapData> data);
+	Ref<HeightMapData> get_data() { return _data; }
+
 	void set_material(Ref<Material> p_material);
 	inline Ref<Material> get_material() const { return _material; }
 
 	void set_collision_enabled(bool enabled);
 	inline bool is_collision_enabled() const { return _collision_enabled; }
 
-	void set_resolution(int p_res);
-	int get_resolution() const;
-
 	void set_lod_scale(float lod_scale);
 	float get_lod_scale() const;
 
 	void set_area_dirty(Point2i origin_in_cells, Point2i size_in_cells);
 	bool cell_raycast(Vector3 origin_world, Vector3 dir_world, Point2i &out_cell_pos);
-
-	HeightMapData &get_data() { return _data; }
 
 protected:
 	void _notification(int p_what);
@@ -48,6 +46,8 @@ private:
 
 	Point2i local_pos_to_cell(Vector3 local_pos) const;
 
+	void on_data_resolution_changed();
+
 	static void _bind_methods();
 
 	static HeightMapChunk *s_make_chunk_cb(void *context, Point2i origin, int lod);
@@ -57,7 +57,7 @@ private:
 private:
 	Ref<Material> _material;
 	bool _collision_enabled;
-	HeightMapData _data;
+	Ref<HeightMapData> _data;
 	HeightMapMesher _mesher;
 	QuadTreeLod<HeightMapChunk *> _lodder;
 

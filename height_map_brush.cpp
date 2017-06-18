@@ -123,7 +123,7 @@ void foreach_xy(
 		height_map.set_area_dirty(origin, shape_size);
 
 	// TODO Eventually HeightMapData will become a resource so we won't need to access the HeightMap node directly
-	HeightMapData &data = height_map.get_data();
+	HeightMapData &data = **height_map.get_data();
 
 	Point2i pos;
 

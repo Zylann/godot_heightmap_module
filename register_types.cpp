@@ -8,6 +8,7 @@ void register_hterrain_types() {
 
 #ifndef _3D_DISABLED
 	ClassDB::register_class<HeightMap>();
+	ClassDB::register_class<HeightMapData>();
 
 #ifdef TOOLS_ENABLED
 	EditorPlugins::add_by_type<HeightMapEditorPlugin>();

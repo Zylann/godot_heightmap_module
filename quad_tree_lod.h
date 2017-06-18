@@ -66,15 +66,24 @@ public:
 		make_func = NULL;
 		recycle_func = NULL;
 		_split_scale = 3;
+		_grids.resize(1);
 	}
 
 	//~QuadTreeLod() {}
 
-	void create_from_sizes(int base_size, int full_size) {
-		for_all_chunks(recycle_func, callbacks_context);
+	void clear() {
+		join_recursively(_tree, _max_depth, callbacks_context);
 
-		_grids.clear();
+		_grids.resize(1);
 		_tree.clear_children();
+
+		_max_depth = 0;
+		_base_size = 0;
+	}
+
+	void create_from_sizes(int base_size, int full_size) {
+
+		clear();
 
 		_base_size = base_size;
 

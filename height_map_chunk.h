@@ -9,7 +9,7 @@ class HeightMapChunk {
 public:
 	Point2i cell_origin;
 
-	HeightMapChunk(Spatial *parent, Point2i cell_pos, Ref<Material> material);
+	HeightMapChunk(Spatial *p_parent, Point2i p_cell_pos, Ref<Material> p_material);
 	~HeightMapChunk();
 
 	void create(Point2i pos, Ref<Material> material);

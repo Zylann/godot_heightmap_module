@@ -1,8 +1,43 @@
 #include "height_map.h"
 
-void HeightMapData::resize(int p_size) {
+#define DEFAULT_RESOLUTION 256
 
-	Point2i size(p_size, p_size);
+const char *HeightMapData::SIGNAL_RESOLUTION_CHANGED = "resolution_changed";
+
+HeightMapData::HeightMapData() {
+
+	set_resolution(DEFAULT_RESOLUTION);
+
+	// TODO Test, won't remain here
+	Point2i size = heights.size();
+	Point2i pos;
+	for (pos.y = 0; pos.y < size.y; ++pos.y) {
+		for (pos.x = 0; pos.x < size.x; ++pos.x) {
+			float h = 8.0 * (Math::cos(pos.x * 0.2) + Math::sin(pos.y * 0.2));
+			heights.set(pos, h);
+		}
+	}
+	update_all_normals();
+}
+
+int HeightMapData::get_resolution() const {
+	return heights.size().x;
+}
+
+void HeightMapData::set_resolution(int p_res) {
+
+	if(p_res == get_resolution())
+		return;
+
+	if (p_res < HeightMap::CHUNK_SIZE)
+		p_res = HeightMap::CHUNK_SIZE;
+
+	// Power of two is important for LOD.
+	// Also, grid data is off by one,
+	// because for an even number of quads you need an odd number of vertices
+	p_res = nearest_power_of_2(p_res - 1) + 1;
+
+	Point2i size(p_res, p_res);
 	heights.resize(size, true, 0);
 	normals.resize(size, true, Vector3(0, 1, 0));
 	colors.resize(size, true, Color(1, 1, 1, 1));
@@ -12,6 +47,8 @@ void HeightMapData::resize(int p_size) {
 		texture_weights[i].resize(size, true, i == 0 ? 1 : 0);
 		texture_indices[i].resize(size, true, 0);
 	}
+
+	emit_signal(SIGNAL_RESOLUTION_CHANGED);
 }
 
 void HeightMapData::update_all_normals() {
@@ -55,3 +92,17 @@ void HeightMapData::update_normals(Point2i min, Point2i size) {
 		}
 	}
 }
+
+void HeightMapData::_bind_methods() {
+
+	ClassDB::bind_method(D_METHOD("set_resolution", "p_res"), &HeightMapData::set_resolution);
+	ClassDB::bind_method(D_METHOD("get_resolution"), &HeightMapData::get_resolution);
+
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "resolution"), "set_resolution", "get_resolution");
+
+	ADD_SIGNAL(MethodInfo(SIGNAL_RESOLUTION_CHANGED));
+}
+
+
+
+

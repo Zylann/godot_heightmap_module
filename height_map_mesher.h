@@ -14,17 +14,20 @@ public:
 		Point2i size;
 		bool smooth;
 		int lod;
-		int seams[4];
 
 		Params() {
 			smooth = true;
 			lod = 0;
-			for (int i = 0; i < 4; ++i)
-				seams[i] = 0;
 		}
 	};
 
 	Ref<Mesh> make_chunk(Params params, const HeightMapData &data);
+
+private:
+	void reset();
+	Ref<Mesh> commit();
+
+	void make_regular(const HeightMapData &data, Point2i min, Point2i max, int stride);
 
 private:
 	Vector<Vector3> _output_vertices;

@@ -1,19 +1,19 @@
 #include "height_map_chunk.h"
 
-HeightMapChunk::HeightMapChunk(Spatial *parent, Point2i cell_pos, Ref<Material> material) {
-	cell_origin = cell_pos;
+HeightMapChunk::HeightMapChunk(Spatial *p_parent, Point2i p_cell_pos, Ref<Material> p_material) {
+	cell_origin = p_cell_pos;
 
 	VisualServer &vs = *VisualServer::get_singleton();
 
 	_mesh_instance = vs.instance_create();
 
-	parent_transform_changed(parent->get_global_transform());
+	parent_transform_changed(p_parent->get_global_transform());
 
-	if (material.is_valid()) {
-		vs.instance_geometry_set_material_override(_mesh_instance, material->get_rid());
+	if (p_material.is_valid()) {
+		vs.instance_geometry_set_material_override(_mesh_instance, p_material->get_rid());
 	}
 
-	Ref<World> world = parent->get_world();
+	Ref<World> world = p_parent->get_world();
 	if (world.is_valid()) {
 		vs.instance_set_scenario(_mesh_instance, world->get_scenario());
 	}

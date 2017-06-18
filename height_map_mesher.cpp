@@ -15,16 +15,6 @@ void copy_to(PoolVector<T> &to, Vector<T> &from) {
 
 Ref<Mesh> HeightMapMesher::make_chunk(Params params, const HeightMapData &data) {
 
-	_output_vertices.clear();
-	_output_normals.clear();
-	_output_colors.clear();
-	//	_output_uv.clear();
-	//	_output_uv2.clear();
-	//	_output_bones.clear();
-	//	_output_tangents.clear();
-	//	_output_weights.clear();
-	_output_indices.clear();
-
 	if (!params.smooth) {
 		; // TODO Faceted version
 		//return make_chunk_faceted(params, data)
@@ -34,7 +24,7 @@ Ref<Mesh> HeightMapMesher::make_chunk(Params params, const HeightMapData &data) 
 
 	Point2i max = params.origin + params.size * stride;
 
-	Point2i terrain_size = data.size();
+	Point2i terrain_size(data.get_resolution(), data.get_resolution());
 
 	if (max.y >= terrain_size.y)
 		max.y = terrain_size.y;
@@ -46,17 +36,29 @@ Ref<Mesh> HeightMapMesher::make_chunk(Params params, const HeightMapData &data) 
 	//		1.0 / static_cast<real_t>(terrain_size_y));
 	// Note: UVs aren't needed because they can be deduced from world positions
 
+	make_regular(data, params.origin, max, stride);
+
+	if (_output_vertices.size() == 0) {
+		print_line("No vertices generated!");
+		return Ref<Mesh>();
+	}
+
+	return commit();
+}
+
+void HeightMapMesher::make_regular(const HeightMapData &data, Point2i min, Point2i max, int stride) {
+
 	// Make central part
 	Point2i pos;
-	for (pos.y = params.origin.y; pos.y <= max.y; pos.y += stride) {
-		for (pos.x = params.origin.x; pos.x <= max.x; pos.x += stride) {
+	for (pos.y = min.y; pos.y <= max.y; pos.y += stride) {
+		for (pos.x = min.x; pos.x <= max.x; pos.x += stride) {
 
 			int loc = data.heights.index(pos);
 
 			_output_vertices.push_back(Vector3(
-					pos.x - params.origin.x,
+					pos.x - min.x,
 					data.heights[loc],
-					pos.y - params.origin.y));
+					pos.y - min.y));
 
 			_output_colors.push_back(data.colors[loc]);
 
@@ -70,18 +72,15 @@ Ref<Mesh> HeightMapMesher::make_chunk(Params params, const HeightMapData &data) 
 		}
 	}
 
-	if (_output_vertices.size() == 0) {
-		print_line("No vertices generated!");
-		return Ref<Mesh>();
-	}
+	Point2i size = (max - min) / stride;
 
 	int i = 0;
-	for (pos.y = 0; pos.y < params.size.y; ++pos.y) {
-		for (pos.x = 0; pos.x < params.size.x; ++pos.x) {
+	for (pos.y = 0; pos.y < size.y; ++pos.y) {
+		for (pos.x = 0; pos.x < size.x; ++pos.x) {
 
 			int i00 = i;
 			int i10 = i + 1;
-			int i01 = i + params.size.x + 1;
+			int i01 = i + size.x + 1;
 			int i11 = i01 + 1;
 
 			float h00 = _output_vertices[i00].y;
@@ -126,6 +125,21 @@ Ref<Mesh> HeightMapMesher::make_chunk(Params params, const HeightMapData &data) 
 		}
 		++i;
 	}
+}
+
+void HeightMapMesher::reset() {
+	_output_vertices.clear();
+	_output_normals.clear();
+	_output_colors.clear();
+	//	_output_uv.clear();
+	//	_output_uv2.clear();
+	//	_output_bones.clear();
+	//	_output_tangents.clear();
+	//	_output_weights.clear();
+	_output_indices.clear();
+}
+
+Ref<Mesh> HeightMapMesher::commit() {
 
 	PoolVector<Vector3> pool_vertices;
 	PoolVector<Vector3> pool_normals;
@@ -147,5 +161,10 @@ Ref<Mesh> HeightMapMesher::make_chunk(Params params, const HeightMapData &data) 
 	Ref<ArrayMesh> mesh_ref(memnew(ArrayMesh));
 	mesh_ref->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
 
+	reset();
+
 	return mesh_ref;
 }
+
+
+
