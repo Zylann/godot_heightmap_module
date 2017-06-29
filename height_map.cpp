@@ -35,8 +35,16 @@ void HeightMap::set_data(Ref<HeightMapData> data) {
 	_data = data;
 
 	if(_data.is_valid()) {
+
+#ifdef TOOLS_ENABLED
+		// This is a small UX improvement so that the user sees a default terrain
+		if(data->get_resolution() == 0) {
+			data->load_default();
+		}
+#endif
 		_data->connect(HeightMapData::SIGNAL_RESOLUTION_CHANGED, this, "_on_data_resolution_changed");
 		on_data_resolution_changed();
+
 	} else {
 		_lodder.clear();
 	}

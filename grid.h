@@ -21,6 +21,10 @@ public:
 		return _data[index(x, y)];
 	}
 
+	inline const T *raw() const {
+		return _data.ptr();
+	}
+
 	inline T operator[](int i) const {
 		return _data[i];
 	}

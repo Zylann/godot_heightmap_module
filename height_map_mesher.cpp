@@ -1,17 +1,6 @@
 #include "height_map_mesher.h"
+#include "utility.h"
 
-// TODO Is this already in engine?
-template <typename T>
-void copy_to(PoolVector<T> &to, Vector<T> &from) {
-
-	to.resize(from.size());
-
-	typename PoolVector<T>::Write w = to.write();
-
-	for (int i = 0; i < from.size(); ++i) {
-		w[i] = from[i];
-	}
-}
 
 Ref<Mesh> HeightMapMesher::make_chunk(Params params, const HeightMapData &data) {
 
