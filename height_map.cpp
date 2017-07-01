@@ -30,6 +30,7 @@ void HeightMap::set_data(Ref<HeightMapData> data) {
 
 	if(_data.is_valid()) {
 		_data->disconnect(HeightMapData::SIGNAL_RESOLUTION_CHANGED, this, "_on_data_resolution_changed");
+		_data->disconnect(HeightMapData::SIGNAL_REGION_CHANGED, this, "_on_data_region_changed");
 	}
 
 	_data = data;
@@ -43,15 +44,21 @@ void HeightMap::set_data(Ref<HeightMapData> data) {
 		}
 #endif
 		_data->connect(HeightMapData::SIGNAL_RESOLUTION_CHANGED, this, "_on_data_resolution_changed");
-		on_data_resolution_changed();
+		_data->connect(HeightMapData::SIGNAL_REGION_CHANGED, this, "_on_data_region_changed");
+		_on_data_resolution_changed();
 
 	} else {
 		_lodder.clear();
 	}
 }
 
-void HeightMap::on_data_resolution_changed() {
+void HeightMap::_on_data_resolution_changed() {
 	_lodder.create_from_sizes(CHUNK_SIZE, _data->get_resolution());
+}
+
+void HeightMap::_on_data_region_changed(int min_x, int min_y, int max_x, int max_y) {
+	//print_line(String("_on_data_region_changed {0}, {1}, {2}, {3}").format(varray(min_x, min_y, max_x, max_y)));
+	set_area_dirty(Point2i(min_x, min_y), Point2i(max_x - min_x, max_y - min_y));
 }
 
 void HeightMap::set_material(Ref<Material> p_material) {
@@ -148,18 +155,6 @@ void HeightMap::update_chunk(HeightMapChunk &chunk, int lod) {
 	mesher_params.size = Point2i(CHUNK_SIZE, CHUNK_SIZE);
 	mesher_params.smooth = true; // TODO Implement this option
 
-	if (mesher_params.smooth) {
-		Point2i cell_size = mesher_params.size;
-		cell_size.x <<= lod;
-		cell_size.y <<= lod;
-
-		// Padding is needed because normals are calculated using neighboring,
-		// so a change in height X also requires normals in X-1 and X+1 to be updated
-		Point2i pad(1, 1);
-
-		_data->update_normals(chunk.cell_origin - pad, cell_size + 2 * pad);
-	}
-
 	Ref<Mesh> mesh = _mesher.make_chunk(mesher_params, **_data);
 	chunk.set_mesh(mesh);
 
@@ -179,12 +174,11 @@ void HeightMap::set_chunk_dirty(Point2i pos, int lod) {
 }
 
 void HeightMap::set_area_dirty(Point2i origin_in_cells, Point2i size_in_cells) {
-	Point2i cmin = origin_in_cells / CHUNK_SIZE;
-	Point2i csize = size_in_cells / CHUNK_SIZE + Point2i(1, 1);
 
-	// TODO take undo/redo into account here?
+	Point2i min = origin_in_cells / CHUNK_SIZE;
+	Point2i max = (origin_in_cells + size_in_cells - Point2i(1,1)) / CHUNK_SIZE + Point2i(1,1);
 
-	_lodder.for_chunks_in_rect(s_set_chunk_dirty_cb, cmin, csize, this);
+	_lodder.for_chunks_in_rect(s_set_chunk_dirty_cb, min, max - min, this);
 }
 
 HeightMapChunk *HeightMap::_make_chunk_cb(Point2i origin, int lod) {
@@ -253,7 +247,8 @@ void HeightMap::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_lod_scale", "scale"), &HeightMap::set_lod_scale);
 	ClassDB::bind_method(D_METHOD("get_lod_scale"), &HeightMap::get_lod_scale);
 
-	ClassDB::bind_method(D_METHOD("_on_data_resolution_changed"), & HeightMap::on_data_resolution_changed);
+	ClassDB::bind_method(D_METHOD("_on_data_resolution_changed"), &HeightMap::_on_data_resolution_changed);
+	ClassDB::bind_method(D_METHOD("_on_data_region_changed"), &HeightMap::_on_data_region_changed);
 
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "data", PROPERTY_HINT_RESOURCE_TYPE, "HeightMapData"), "set_data", "get_data");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "material", PROPERTY_HINT_RESOURCE_TYPE, "Material"), "set_material", "get_material");

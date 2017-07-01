@@ -3,6 +3,8 @@
 
 #include <core/math/math_2d.h>
 #include <core/vector.h>
+#include <core/dvector.h>
+#include <core/variant.h>
 
 template <typename T>
 class Grid2D {
@@ -176,6 +178,82 @@ public:
 		for (int i = 0; i < _data.size(); ++i) {
 			_data[i] = value;
 		}
+	}
+
+	PoolByteArray dump_region(Point2i min, Point2i max) const {
+
+		ERR_FAIL_COND_V(!is_valid_pos(min), PoolByteArray());
+		ERR_FAIL_COND_V(!is_valid_pos(max), PoolByteArray());
+
+		PoolByteArray output;
+		Point2i size = max - min;
+		int area = size.x * size.y;
+		output.resize(area * sizeof(T));
+
+		{
+			PoolByteArray::Write w8 = output.write();
+			T *wt = (T *)w8.ptr();
+
+			int i = 0;
+			Point2i pos;
+			for(pos.y = min.y; pos.y < max.y; ++pos.y) {
+				for(pos.x = min.x; pos.x < max.x; ++pos.x) {
+					T v = get(pos);
+					wt[i] = v;
+					++i;
+				}
+			}
+		}
+
+		return output;
+	}
+
+	void apply_dump(const PoolByteArray &data, Point2i min, Point2i max) {
+
+		ERR_FAIL_COND(!is_valid_pos(min));
+		ERR_FAIL_COND(!is_valid_pos(max));
+
+		Point2i size = max - min;
+		int area = size.x * size.y;
+
+		ERR_FAIL_COND(area != data.size() / sizeof(T));
+
+		{
+			PoolByteArray::Read r = data.read();
+			const T *rt = (const T*)r.ptr();
+
+			int i = 0;
+			Point2i pos;
+			for(pos.y = min.y; pos.y < max.y; ++pos.y) {
+				for(pos.x = min.x; pos.x < max.x; ++pos.x) {
+					set(pos, rt[i]);
+					++i;
+				}
+			}
+		}
+	}
+
+	void clamp_min_max_excluded(Point2i &min, Point2i &max) const {
+
+		if (min.x < 0)
+			min.x = 0;
+		if (min.y < 0)
+			min.y = 0;
+
+		if (min.x >= _size.x)
+			min.x = _size.x - 1;
+		if (min.y >= _size.y)
+			min.y = _size.y - 1;
+
+		if (max.x < 0)
+			max.x = 0;
+		if (max.y < 0)
+			max.y = 0;
+
+		if (max.x > _size.x)
+			max.x = _size.x;
+		if (max.y > _size.y)
+			max.y = _size.y;
 	}
 
 private:

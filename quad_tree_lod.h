@@ -6,6 +6,7 @@
 #include <core/math/vector3.h>
 #include <core/variant.h>
 
+// Independent quad tree designed to handle LOD
 template <typename T>
 class QuadTreeLod {
 
@@ -160,9 +161,10 @@ public:
 			const HashMap<Point2i, T> &grid = _grids[lod];
 			int s = get_lod_size(lod);
 
-			// Convert rect into this lod's coordinates
+			// Convert rect into this lod's coordinates:
+			// Pick min and max (included), divide them, then add 1 to max so it's excluded again
 			Point2i min = cpos0 / s;
-			Point2i max = cpos0 + csize + Point2i(1, 1);
+			Point2i max = (cpos0 + csize - Point2i(1 ,1)) / s + Point2i(1, 1);
 
 			// Find which chunks are within
 			Point2i cpos;

@@ -46,7 +46,8 @@ private:
 
 	Point2i local_pos_to_cell(Vector3 local_pos) const;
 
-	void on_data_resolution_changed();
+	void _on_data_resolution_changed();
+	void _on_data_region_changed(int min_x, int min_y, int max_x, int max_y);
 
 	static void _bind_methods();
 

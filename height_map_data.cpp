@@ -1,29 +1,24 @@
-#include "height_map.h"
 #include <core/os/file_access.h>
 #include <core/io/file_access_compressed.h>
+#include <core/array.h>
+#include "height_map.h"
 
 #define DEFAULT_RESOLUTION 256
 #define HEIGHTMAP_EXTENSION "heightmap"
 
 const char *HeightMapData::SIGNAL_RESOLUTION_CHANGED = "resolution_changed";
+const char *HeightMapData::SIGNAL_REGION_CHANGED = "region_changed";
 
 
 HeightMapData::HeightMapData() {
+#ifdef TOOLS_ENABLED
+	_disable_apply_undo = false;
+#endif
 }
 
 void HeightMapData::load_default() {
 
 	set_resolution(DEFAULT_RESOLUTION);
-
-	// TODO Test, won't remain here
-	Point2i size = heights.size();
-	Point2i pos;
-	for (pos.y = 0; pos.y < size.y; ++pos.y) {
-		for (pos.x = 0; pos.x < size.x; ++pos.x) {
-			float h = 8.0 * (Math::cos(pos.x * 0.2) + Math::sin(pos.y * 0.2));
-			heights.set(pos, h);
-		}
-	}
 	update_all_normals();
 }
 
@@ -67,25 +62,7 @@ void HeightMapData::update_normals(Point2i min, Point2i size) {
 	Point2i max = min + size;
 	Point2i pos;
 
-	if (min.x < 0)
-		min.x = 0;
-	if (min.y < 0)
-		min.y = 0;
-
-	if (min.x > normals.size().x)
-		min.x = normals.size().x;
-	if (min.y > normals.size().y)
-		min.y = normals.size().y;
-
-	if (max.x < 0)
-		max.x = 0;
-	if (max.y < 0)
-		max.y = 0;
-
-	if (max.x > normals.size().x)
-		max.x = normals.size().x;
-	if (max.y > normals.size().y)
-		max.y = normals.size().y;
+	heights.clamp_min_max_excluded(min, max);
 
 	for (pos.y = min.y; pos.y < max.y; ++pos.y) {
 		for (pos.x = min.x; pos.x < max.x; ++pos.x) {
@@ -100,14 +77,91 @@ void HeightMapData::update_normals(Point2i min, Point2i size) {
 	}
 }
 
+void HeightMapData::notify_region_change(Point2i min, Point2i max) {
+	emit_signal(SIGNAL_REGION_CHANGED, min.x, min.y, max.x, max.y);
+}
+
+#ifdef TOOLS_ENABLED
+
+// Very specific to the editor.
+// undo_data contains chunked grids of modified terrain in a given channel.
+void HeightMapData::_apply_undo(Dictionary undo_data) {
+
+	if(_disable_apply_undo)
+		return;
+
+	Array chunk_positions = undo_data["chunk_positions"];
+	Array chunk_datas = undo_data["data"];
+	int channel = undo_data["channel"];
+
+	// Validate input
+
+	ERR_FAIL_COND(channel < 0 || channel >= CHANNEL_COUNT);
+	ERR_FAIL_COND(chunk_positions.size()/2 != chunk_datas.size());
+
+	ERR_FAIL_COND(chunk_positions.size() % 2 != 0);
+	for(int i = 0; i < chunk_positions.size(); ++i) {
+		Variant p = chunk_positions[i];
+		ERR_FAIL_COND(p.get_type() != Variant::INT);
+	}
+	for(int i = 0; i < chunk_datas.size(); ++i) {
+		Variant d = chunk_datas[i];
+		ERR_FAIL_COND(d.get_type() != Variant::POOL_BYTE_ARRAY);
+	}
+
+	// Apply
+
+	for(int i = 0; i < chunk_datas.size(); ++i) {
+		Point2i cpos;
+		cpos.x = chunk_positions[2 * i];
+		cpos.y = chunk_positions[2 * i + 1];
+
+		Point2i min = cpos * HeightMap::CHUNK_SIZE;
+		Point2i max = min + Point2i(1, 1) * HeightMap::CHUNK_SIZE;
+
+		PoolByteArray data = chunk_datas[i];
+
+		switch(channel) {
+
+			case HeightMapData::CHANNEL_HEIGHT:
+				heights.apply_dump(data, min, max);
+				// Padding is needed because normals are calculated using neighboring,
+				// so a change in height X also requires normals in X-1 and X+1 to be updated
+				update_normals(min - Point2i(1,1), max + Point2i(1,1));
+				break;
+
+			case HeightMapData::CHANNEL_COLOR:
+				colors.apply_dump(data, min, max);
+				break;
+
+			// TODO Texture paint undo
+
+			default:
+				print_line("Wut? Unsupported undo channel");
+				break;
+		}
+
+		notify_region_change(min, max);
+	}
+}
+
+#endif
+
 void HeightMapData::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_resolution", "p_res"), &HeightMapData::set_resolution);
 	ClassDB::bind_method(D_METHOD("get_resolution"), &HeightMapData::get_resolution);
 
+	ClassDB::bind_method(D_METHOD("_apply_undo", "data"), &HeightMapData::_apply_undo);
+
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "resolution"), "set_resolution", "get_resolution");
 
 	ADD_SIGNAL(MethodInfo(SIGNAL_RESOLUTION_CHANGED));
+	ADD_SIGNAL(MethodInfo(SIGNAL_REGION_CHANGED,
+						  PropertyInfo(Variant::INT, "min_x"),
+						  PropertyInfo(Variant::INT, "min_y"),
+						  PropertyInfo(Variant::INT, "max_x"),
+						  PropertyInfo(Variant::INT, "max_y")));
 }
 
 

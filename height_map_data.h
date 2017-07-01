@@ -6,6 +6,7 @@
 #include <core/resource.h>
 #include <core/io/resource_loader.h>
 #include <core/io/resource_saver.h>
+#include <core/dictionary.h>
 
 #include "grid.h"
 
@@ -14,7 +15,17 @@ class HeightMapData : public Resource {
 public:
 	enum { TEXTURE_INDEX_COUNT = 4 };
 
+	enum Channel {
+		CHANNEL_HEIGHT = 0,
+		CHANNEL_NORMAL,
+		CHANNEL_COLOR,
+		CHANNEL_TEXTURE_WEIGHT,
+		CHANNEL_TEXTURE_INDEX,
+		CHANNEL_COUNT
+	};
+
 	static const char *SIGNAL_RESOLUTION_CHANGED;
+	static const char *SIGNAL_REGION_CHANGED;
 
 	HeightMapData();
 
@@ -26,6 +37,8 @@ public:
 	void update_all_normals();
 	void update_normals(Point2i min, Point2i size);
 
+	void notify_region_change(Point2i min, Point2i max);
+
 	// Public for convenience.
 	// Do not attempt to resize them!
 	Grid2D<float> heights;
@@ -33,6 +46,16 @@ public:
 	Grid2D<Color> colors;
 	Grid2D<float> texture_weights[TEXTURE_INDEX_COUNT];
 	Grid2D<char> texture_indices[TEXTURE_INDEX_COUNT];
+
+#ifdef TOOLS_ENABLED
+	bool _disable_apply_undo;
+#endif
+
+private:
+
+#ifdef TOOLS_ENABLED
+	void _apply_undo(Dictionary undo_data);
+#endif
 
 private:
 	static void _bind_methods();

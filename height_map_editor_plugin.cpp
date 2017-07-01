@@ -88,7 +88,51 @@ bool HeightMapEditorPlugin::forward_spatial_gui_input(Camera *p_camera, const Re
 					_mouse_pressed = true;
 				captured_event = true;
 
-				// TODO Prepare undo/redo
+				if(_mouse_pressed == false) {
+					// Just finished painting
+
+					ERR_FAIL_COND_V(_height_map->get_data().is_null(), captured_event);
+					HeightMapData *heightmap_data = *_height_map->get_data();
+
+					HeightMapBrush::UndoData ur_data = _brush.pop_undo_redo_data(*heightmap_data);
+
+					Dictionary undo_data;
+					undo_data["chunk_positions"] = ur_data.chunk_positions;
+					undo_data["data"] = ur_data.undo;
+					undo_data["channel"] = ur_data.channel;
+
+					Dictionary redo_data;
+					redo_data["chunk_positions"] = ur_data.chunk_positions;
+					redo_data["data"] = ur_data.redo;
+					redo_data["channel"] = ur_data.channel;
+
+					UndoRedo &ur = *EditorNode::get_singleton()->get_undo_redo();
+
+					String action_name;
+					switch(ur_data.channel) {
+						case HeightMapData::CHANNEL_COLOR:
+							action_name = TTR("Modify HeightMapData Color");
+							break;
+						case HeightMapData::CHANNEL_HEIGHT:
+							action_name = TTR("Modify HeightMapData Height");
+							break;
+						default:
+							action_name = TTR("Modify HeightMapData");
+							break;
+					}
+
+					ur.create_action(action_name);
+					ur.add_do_method(heightmap_data, "_apply_undo", redo_data);
+					ur.add_undo_method(heightmap_data, "_apply_undo", undo_data);
+
+					// Small hack here:
+					// commit_actions executes the do method, however terrain modifications are heavy ones,
+					// so we don't really want to re-run an update in every chunk that was modified during painting.
+					// The data is already in its final state, so we just prevent the resource from applying changes here.
+					heightmap_data->_disable_apply_undo = true;
+					ur.commit_action();
+					heightmap_data->_disable_apply_undo = false;
+				}
 			}
 		}
 

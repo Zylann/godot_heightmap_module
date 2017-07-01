@@ -16,6 +16,13 @@ public:
 		MODE_COUNT
 	};
 
+	struct UndoData {
+		PoolIntArray chunk_positions;
+		Array undo;
+		Array redo;
+		int channel;
+	};
+
 	HeightMapBrush();
 
 	void set_mode(Mode mode);
@@ -36,16 +43,25 @@ public:
 	void set_color(Color c);
 	Color get_color() const { return _color; }
 
-	void paint(HeightMap &height_map, Point2i cell_pos, int override_mode = -1);
+	void paint(HeightMap &height_map, Point2i cell_pos, int override_mode);
+
+	UndoData pop_undo_redo_data(const HeightMapData &heightmap_data);
+
+	struct UndoCache {
+		HashMap<Point2i,PoolByteArray> chunks;
+		void clear() {
+			chunks.clear();
+		}
+	};
 
 private:
 	void generate_procedural(int radius);
 
-	void paint_height(HeightMap &height_map, Point2i cell_pos, float speed);
-	void smooth_height(HeightMap &height_map, Point2i cell_pos, float speed);
-	void flatten_height(HeightMap &height_map, Point2i cell_pos);
-	void paint_indexed_texture(HeightMap &height_map, Point2i cell_pos);
-	void paint_color(HeightMap &height_map, Point2i cell_pos);
+	void paint_height(HeightMapData &data, Point2i cell_pos, float speed);
+	void smooth_height(HeightMapData &data, Point2i cell_pos, float speed);
+	void flatten_height(HeightMapData &data, Point2i cell_pos);
+	void paint_indexed_texture(HeightMapData &data, Point2i cell_pos);
+	void paint_color(HeightMapData &data, Point2i cell_pos);
 
 private:
 	int _radius;
@@ -56,6 +72,7 @@ private:
 	float _flatten_height;
 	int _texture_index;
 	Color _color;
+	UndoCache _undo_cache;
 };
 
 #endif // HEIGHT_MAP_BRUSH_H
