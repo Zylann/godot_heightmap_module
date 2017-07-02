@@ -172,19 +172,15 @@ const char *HEIGHTMAP_MAGIC_V1 = "GDHM";
 const char *HEIGHTMAP_SUB_V1 = "v1__";
 
 inline uint8_t encode_normal(float n) {
-	return CLAMP(static_cast<int>(n * 127.f) + 128, 0, 255);
+	return CLAMP(static_cast<int>(n * 127.f) + 127, 0, 255);
+}
+
+inline float decode_normal(uint8_t n) {
+	return static_cast<float>(n) / 127.f - 1.f;
 }
 
 inline uint16_t encode_quantified(float h, float hmin, float hrange) {
 	return CLAMP(static_cast<int>(65535.f * (h - hmin) / hrange), 0, 65535);
-}
-
-//inline uint8_t encode01(float v) {
-//	return CLAMP(static_cast<int>(v * 255.f), 0, 255);
-//}
-
-inline float decode_normal(uint8_t n) {
-	return static_cast<float>(n) / 255.f - 128.f;
 }
 
 inline float decode_quantified(uint16_t h, float hmin, float hrange) {
