@@ -38,4 +38,11 @@ private:
 	bool _mouse_pressed;
 };
 
+class HeightMapPreviewGenerator : public EditorResourcePreviewGenerator {
+	GDCLASS(HeightMapPreviewGenerator, EditorResourcePreviewGenerator)
+public:
+	bool handles(const String &p_type) const;
+	Ref<Texture> generate(const Ref<Resource> &p_from);
+};
+
 #endif // HEIGHT_MAP_EDITOR_PLUGIN_H

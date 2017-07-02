@@ -63,6 +63,8 @@ HeightMapEditorPlugin::HeightMapEditorPlugin(EditorNode *p_editor) {
 		button->connect("pressed", this, "_on_mode_selected", varray(mode));
 		_toolbar->add_child(button);
 	}
+
+	get_resource_previewer()->add_preview_generator(Ref<EditorResourcePreviewGenerator>(memnew(HeightMapPreviewGenerator())));
 }
 
 HeightMapEditorPlugin::~HeightMapEditorPlugin() {
@@ -211,3 +213,58 @@ void HeightMapEditorPlugin::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("_on_mode_selected", "mode"), &HeightMapEditorPlugin::on_mode_selected);
 	ClassDB::bind_method(D_METHOD("_on_brush_param_changed", "value", "param"), &HeightMapEditorPlugin::on_brush_param_changed);
 }
+
+//------------------------------------------
+// Preview generator
+
+bool HeightMapPreviewGenerator::handles(const String &p_type) const {
+	return p_type == "HeightMapData";
+}
+
+Ref<Texture> HeightMapPreviewGenerator::generate(const Ref<Resource> &p_from) {
+
+	Ref<HeightMapData> data_ref = p_from;
+	ERR_FAIL_COND_V(data_ref.is_null(), Ref<Texture>());
+	HeightMapData &data = **data_ref;
+
+	if(data.heights.size().x == 0 || data.heights.size().y == 0)
+		return Ref<Texture>();
+
+	int thumbnail_size = EditorSettings::get_singleton()->get("filesystem/file_dialog/thumbnail_size");
+	thumbnail_size *= EDSCALE;
+	Ref<Image> img_ref;
+	img_ref.instance();
+	Image &im = **img_ref;
+
+	im.create(thumbnail_size, thumbnail_size, 0, Image::FORMAT_RGBA8);
+
+	im.lock();
+
+	Vector3 light_dir = Vector3(-1, -0.5, -1).normalized();
+
+	for(int y = 0; y < im.get_height(); ++y) {
+		for(int x = 0; x < im.get_width(); ++x) {
+
+			float fx = static_cast<float>(x) / im.get_width();
+			float fy = static_cast<float>(im.get_height() - y - 1) / im.get_height();
+			Point2i mpos(fx * data.heights.size().x, fy * data.heights.size().y);
+
+			Vector3 n = data.normals.get(mpos);
+			float ndot = -n.dot(light_dir);
+			float gs = CLAMP(0.5*ndot+0.5, 0.0, 1.0);
+			Color col(gs, gs, gs, 1.0);
+
+			im.put_pixel(x, y, col);
+		}
+	}
+
+	im.unlock();
+
+	Ref<ImageTexture> ptex = Ref<ImageTexture>(memnew(ImageTexture));
+
+	ptex->create_from_image(img_ref, 0);
+	return ptex;
+}
+
+
+
