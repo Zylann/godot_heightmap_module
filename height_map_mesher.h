@@ -9,6 +9,13 @@
 class HeightMapMesher {
 
 public:
+	enum SeamFlag {
+		SEAM_LEFT = 1,
+		SEAM_RIGHT = 2,
+		SEAM_TOP = 4,
+		SEAM_BOTTOM = 8
+	};
+
 	struct Params {
 		Point2i origin;
 		Point2i size;
@@ -28,6 +35,8 @@ private:
 	Ref<Mesh> commit();
 
 	void make_regular(const HeightMapData &data, Point2i min, Point2i max, int stride);
+	void make_indices(Point2i chunk_size, unsigned int seams);
+	void make_indices_legacy(Point2i chunk_size);
 
 private:
 	Vector<Vector3> _output_vertices;

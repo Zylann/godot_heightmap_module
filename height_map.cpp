@@ -1,26 +1,75 @@
 #include "height_map.h"
 #include <scene/3d/camera.h>
 
-// Chunk actions that don't need private access to HeightMap
-static void s_set_material_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
-static void s_delete_chunk_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
-static void s_enter_world_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
-static void s_exit_world_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
-static void s_transform_changed_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
-static void s_visibility_changed_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
+namespace {
+
+	struct SetMaterialAction {
+		Ref<Material> material;
+		void operator()(HeightMapChunk &chunk) {
+			chunk.set_material(material);
+		}
+	};
+
+	struct EnterWorldAction {
+		Ref<World> world;
+		void operator()(HeightMapChunk &chunk) {
+			chunk.enter_world(**world);
+		}
+	};
+
+	struct ExitWorldAction {
+		void operator()(HeightMapChunk &chunk) {
+			chunk.exit_world();
+		}
+	};
+
+	struct TransformChangedAction {
+		Transform *transform;
+		void operator()(HeightMapChunk &chunk) {
+			chunk.parent_transform_changed(*transform);
+		}
+	};
+
+	struct VisibilityChangedAction {
+		bool visible;
+		void operator()(HeightMapChunk &chunk) {
+			chunk.set_visible(visible);
+		}
+	};
+
+	struct DeleteChunkAction {
+		void operator()(HeightMapChunk &chunk) {
+			memdelete(&chunk);
+		}
+	};
+}
 
 HeightMap::HeightMap() {
+
 	set_notify_transform(true);
-
 	_collision_enabled = true;
-
-	_lodder.make_func = s_make_chunk_cb;
-	_lodder.recycle_func = s_recycle_chunk_cb;
+	_lodder.set_callbacks(s_make_chunk_cb, s_recycle_chunk_cb, this);
+	_remeshed_chunks = 0;
+	//print_line("HeightMap()");
 }
 
 HeightMap::~HeightMap() {
-	// Free chunks
-	_lodder.for_all_chunks(s_delete_chunk_cb, this);
+	clear_chunk_cache();
+	//print_line("~HeightMap()");
+}
+
+void HeightMap::clear_chunk_cache() {
+	for_all_chunks(DeleteChunkAction());
+	_chunk_cache.clear();
+}
+
+HeightMapChunk *HeightMap::get_chunk_at(Point2i pos, int lod) const {
+	if(lod < _chunk_cache.size()) {
+		HeightMapChunk *const *pptr = _chunk_cache[lod].getptr(pos);
+		if(pptr)
+			return *pptr;
+	}
+	return NULL;
 }
 
 void HeightMap::set_data(Ref<HeightMapData> data) {
@@ -34,6 +83,8 @@ void HeightMap::set_data(Ref<HeightMapData> data) {
 	}
 
 	_data = data;
+
+	clear_chunk_cache();
 
 	if(_data.is_valid()) {
 
@@ -53,10 +104,13 @@ void HeightMap::set_data(Ref<HeightMapData> data) {
 }
 
 void HeightMap::_on_data_resolution_changed() {
+	clear_chunk_cache();
+	_pending_chunk_updates.clear();
 	_lodder.create_from_sizes(CHUNK_SIZE, _data->get_resolution());
+	_chunk_cache.resize(_lodder.get_lod_count() + 1);
 }
 
-void HeightMap::_on_data_region_changed(int min_x, int min_y, int max_x, int max_y) {
+void HeightMap::_on_data_region_changed(int min_x, int min_y, int max_x, int max_y) {	
 	//print_line(String("_on_data_region_changed {0}, {1}, {2}, {3}").format(varray(min_x, min_y, max_x, max_y)));
 	set_area_dirty(Point2i(min_x, min_y), Point2i(max_x - min_x, max_y - min_y));
 }
@@ -64,13 +118,13 @@ void HeightMap::_on_data_region_changed(int min_x, int min_y, int max_x, int max
 void HeightMap::set_material(Ref<Material> p_material) {
 	if (_material != p_material) {
 		_material = p_material;
-		_lodder.for_all_chunks(s_set_material_cb, this);
+		for_all_chunks(SetMaterialAction { p_material });
 	}
 }
 
 void HeightMap::set_collision_enabled(bool enabled) {
 	_collision_enabled = enabled;
-	// TODO Update chunks
+	// TODO Update chunks / enable heightmap collider (or will be done through a different node perhaps)
 }
 
 void HeightMap::set_lod_scale(float lod_scale) {
@@ -90,21 +144,21 @@ void HeightMap::_notification(int p_what) {
 
 		case NOTIFICATION_ENTER_WORLD: {
 			Ref<World> world = get_world();
-			_lodder.for_all_chunks(s_enter_world_cb, *world);
+			for_all_chunks(EnterWorldAction { world });
 		} break;
 
 		case NOTIFICATION_EXIT_WORLD:
-			_lodder.for_all_chunks(s_exit_world_cb, NULL);
+			for_all_chunks(ExitWorldAction());
 			break;
 
 		case NOTIFICATION_TRANSFORM_CHANGED: {
 			Transform world_transform = get_global_transform();
-			_lodder.for_all_chunks(s_transform_changed_cb, &world_transform);
+			for_all_chunks(TransformChangedAction { &world_transform });
 		} break;
 
 		case NOTIFICATION_VISIBILITY_CHANGED: {
 			bool visible = is_visible();
-			_lodder.for_all_chunks(s_visibility_changed_cb, &visible);
+			for_all_chunks(VisibilityChangedAction { visible });
 		} break;
 
 		case NOTIFICATION_PROCESS:
@@ -116,7 +170,7 @@ void HeightMap::_notification(int p_what) {
 void HeightMap::_process() {
 
 	// Get viewer pos
-	Vector3 viewer_pos;
+	Vector3 viewer_pos = _manual_viewer_pos;
 	Viewport *viewport = get_viewport();
 	if (viewport) {
 		Camera *camera = viewport->get_camera();
@@ -125,74 +179,140 @@ void HeightMap::_process() {
 		}
 	}
 
-	// Update LOD container
-	_lodder.update(viewer_pos, this);
+	if(_data.is_valid())
+		_lodder.update(viewer_pos);
+
+	_remeshed_chunks = 0;
 
 	// Update chunks
-	for (int lod = 0; lod < _pending_chunk_updates.size(); ++lod) {
-		HashMap<Point2i, bool> &pending_chunks = _pending_chunk_updates[lod];
-		if (pending_chunks.size() != 0) {
+	for(int i = 0; i < _pending_chunk_updates.size(); ++i) {
 
-			const Point2i *key = NULL;
-			while (key = pending_chunks.next(key)) {
+		PendingChunkUpdate u = _pending_chunk_updates[i];
+		HeightMapChunk *chunk = get_chunk_at(u.pos, u.lod);
+		ERR_FAIL_COND(chunk == NULL);
+		update_chunk(*chunk, u.lod);
+	}
 
-				HeightMapChunk *chunk = NULL;
-				_lodder.try_get_chunk_at(chunk, *key, lod);
-				ERR_FAIL_COND(chunk == NULL);
-				update_chunk(*chunk, lod);
-			}
-		}
-		pending_chunks.clear();
+	_pending_chunk_updates.clear();
+
+	// DEBUG
+	if(_remeshed_chunks > 0) {
+		print_line(String("Remeshed {0} chunks").format(varray(_remeshed_chunks)));
 	}
 }
 
 void HeightMap::update_chunk(HeightMapChunk &chunk, int lod) {
 	ERR_FAIL_COND(_data.is_null())
 
-	HeightMapMesher::Params mesher_params;
-	mesher_params.lod = lod;
-	mesher_params.origin = chunk.cell_origin;
-	mesher_params.size = Point2i(CHUNK_SIZE, CHUNK_SIZE);
-	mesher_params.smooth = true; // TODO Implement this option
+	if(chunk.is_dirty()) {
 
-	Ref<Mesh> mesh = _mesher.make_chunk(mesher_params, **_data);
-	chunk.set_mesh(mesh);
+		HeightMapMesher::Params mesher_params;
+		mesher_params.lod = lod;
+		mesher_params.origin = chunk.cell_origin;
+		mesher_params.size = Point2i(CHUNK_SIZE, CHUNK_SIZE);
+		mesher_params.smooth = true; // TODO Implement this option
+
+		Ref<Mesh> mesh = _mesher.make_chunk(mesher_params, **_data);
+		chunk.set_mesh(mesh);
+		chunk.set_dirty(false);
+
+		++_remeshed_chunks;
+	}
+
+	// TODO Update seams
+
+	chunk.set_visible(is_visible());
+	chunk.set_pending_update(false);
 
 	if (get_tree()->is_editor_hint() == false) {
-		// TODO Generate collider
+		// TODO Generate collider? Or delegate this to another node
 	}
 }
 
-void HeightMap::set_chunk_dirty(Point2i pos, int lod) {
-	if (_pending_chunk_updates.size() <= lod)
-		_pending_chunk_updates.resize(lod + 1);
-	HashMap<Point2i, bool> &pending_chunks = _pending_chunk_updates[lod];
-	// Note: if the chunk has already been made dirty,
-	// nothing will change and the chunk will be updated only once when the update step comes.
-	pending_chunks[pos] = true;
+void HeightMap::add_chunk_update(HeightMapChunk &chunk, Point2i pos, int lod) {
+
+	if(chunk.is_pending_update()) {
+		//print_line("Chunk update is already pending!");
+		return;
+	}
+
+	// No update pending for this chunk, create one
+	PendingChunkUpdate u;
+	u.pos = pos;
+	u.lod = lod;
+	_pending_chunk_updates.push_back(u);
+
+	chunk.set_pending_update(true);
+
 	// TODO Neighboring chunks might need an update too because of normals and seams being updated
 }
 
 void HeightMap::set_area_dirty(Point2i origin_in_cells, Point2i size_in_cells) {
 
-	Point2i min = origin_in_cells / CHUNK_SIZE;
-	Point2i max = (origin_in_cells + size_in_cells - Point2i(1,1)) / CHUNK_SIZE + Point2i(1,1);
+	Point2i cpos0 = origin_in_cells / CHUNK_SIZE;
+	Point2i csize = (origin_in_cells + size_in_cells - Point2i(1,1)) / CHUNK_SIZE + Point2i(1,1);
 
-	_lodder.for_chunks_in_rect(s_set_chunk_dirty_cb, min, max - min, this);
+	// For each lod
+	for (int lod = 0; lod < _chunk_cache.size(); ++lod) {
+
+		// Get grid and chunk size
+		const HashMap<Point2i, HeightMapChunk*> &grid = _chunk_cache[lod];
+		int s = _lodder.get_lod_size(lod);
+
+		// Convert rect into this lod's coordinates:
+		// Pick min and max (included), divide them, then add 1 to max so it's excluded again
+		Point2i min = cpos0 / s;
+		Point2i max = (cpos0 + csize - Point2i(1 ,1)) / s + Point2i(1, 1);
+
+		// Find which chunks are within
+		Point2i cpos;
+		for (cpos.y = min.y; cpos.y < max.y; ++cpos.y) {
+			for (cpos.x = min.x; cpos.x < max.x; ++cpos.x) {
+
+				HeightMapChunk *const *chunk_ptr = grid.getptr(cpos);
+
+				if (chunk_ptr) {
+					HeightMapChunk *chunk = *chunk_ptr;
+
+					// Make chunk dirty
+					chunk->set_dirty(true);
+					if(chunk->is_active()) {
+						add_chunk_update(*chunk, cpos, lod);
+					}
+				}
+			}
+		}
+	}
 }
 
+// Called when a chunk is needed to be seen
 HeightMapChunk *HeightMap::_make_chunk_cb(Point2i origin, int lod) {
-	int lod_size = _lodder.get_lod_size(lod);
-	Point2i origin_in_cells = origin * CHUNK_SIZE * lod_size;
-	HeightMapChunk *chunk = memnew(HeightMapChunk(this, origin_in_cells, _material));
 
-	set_chunk_dirty(origin, lod);
+	HeightMapChunk *chunk = get_chunk_at(origin, lod);
+
+	if(chunk == NULL) {
+
+		// This is the first time this chunk is required at this lod, generate it
+		int lod_factor = _lodder.get_lod_size(lod);
+		Point2i origin_in_cells = origin * CHUNK_SIZE * lod_factor;
+		chunk = memnew(HeightMapChunk(this, origin_in_cells, _material));
+		chunk->set_dirty(true);
+		_chunk_cache[lod][origin] = chunk;
+
+	}
+
+	// Make sure it gets updated
+	add_chunk_update(*chunk, origin, lod);
+
+	chunk->set_active(true);
 
 	return chunk;
 }
 
+// Called when a chunk is no longer seen
 void HeightMap::_recycle_chunk_cb(HeightMapChunk *chunk) {
-	memdelete(chunk);
+	chunk->set_visible(false);
+	chunk->set_active(false);
 }
 
 Point2i HeightMap::local_pos_to_cell(Vector3 local_pos) const {
@@ -256,6 +376,8 @@ void HeightMap::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "lod_scale"), "set_lod_scale", "get_lod_scale");
 }
 
+// Callbacks configured for QuadTreeLod
+
 HeightMapChunk *HeightMap::s_make_chunk_cb(void *context, Point2i origin, int lod) {
 	HeightMap *self = reinterpret_cast<HeightMap *>(context);
 	return self->_make_chunk_cb(origin, lod);
@@ -266,35 +388,4 @@ void HeightMap::s_recycle_chunk_cb(void *context, HeightMapChunk *chunk, Point2i
 	self->_recycle_chunk_cb(chunk);
 }
 
-void HeightMap::s_set_chunk_dirty_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod) {
-	HeightMap *self = reinterpret_cast<HeightMap *>(context);
-	self->set_chunk_dirty(origin, lod);
-}
 
-void s_set_material_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod) {
-	HeightMap *self = reinterpret_cast<HeightMap *>(context);
-	chunk->set_material(self->get_material());
-}
-
-void s_delete_chunk_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod) {
-	memdelete(chunk);
-}
-
-void s_enter_world_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod) {
-	World *world = reinterpret_cast<World *>(context);
-	chunk->enter_world(*world);
-}
-
-void s_exit_world_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod) {
-	chunk->exit_world();
-}
-
-void s_transform_changed_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod) {
-	Transform *transform = reinterpret_cast<Transform *>(context);
-	chunk->parent_transform_changed(*transform);
-}
-
-void s_visibility_changed_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod) {
-	bool *visible = reinterpret_cast<bool *>(context);
-	chunk->set_visible(*visible);
-}

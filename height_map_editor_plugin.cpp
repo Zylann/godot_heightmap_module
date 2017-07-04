@@ -1,5 +1,6 @@
 #include <core/os/input.h>
 #include <scene/3d/camera.h>
+#include <scene/scene_string_names.h>
 
 #include "height_map_editor_plugin.h"
 
@@ -10,6 +11,7 @@ inline Ref<Texture> get_icon(String name) {
 HeightMapEditorPlugin::HeightMapEditorPlugin(EditorNode *p_editor) {
 	_editor = p_editor;
 	_mouse_pressed = false;
+	_height_map = NULL;
 
 	_brush.set_radius(5);
 
@@ -71,6 +73,9 @@ HeightMapEditorPlugin::~HeightMapEditorPlugin() {
 }
 
 bool HeightMapEditorPlugin::forward_spatial_gui_input(Camera *p_camera, const Ref<InputEvent> &p_event) {
+	ERR_FAIL_COND_V(_height_map == NULL, false);
+
+	_height_map->_manual_viewer_pos = p_camera->get_global_transform().origin;
 
 	bool captured_event = false;
 
@@ -170,7 +175,24 @@ void HeightMapEditorPlugin::paint(Camera &camera, Vector2 screen_pos, int overri
 }
 
 void HeightMapEditorPlugin::edit(Object *p_object) {
-	_height_map = p_object ? p_object->cast_to<HeightMap>() : NULL;
+
+	//printf("Edit %i\n", p_object);
+	HeightMap *node = p_object ? p_object->cast_to<HeightMap>() : NULL;
+
+	if(_height_map) {
+		_height_map->disconnect(SceneStringNames::get_singleton()->tree_exited, this, "_height_map_exited_scene");
+	}
+
+	_height_map = node;
+
+	if(_height_map) {
+		_height_map->connect(SceneStringNames::get_singleton()->tree_exited, this, "_height_map_exited_scene");
+	}
+}
+
+void HeightMapEditorPlugin::_height_map_exited_scene() {
+	//print_line("HeightMap exited scene");
+	edit(NULL);
 }
 
 bool HeightMapEditorPlugin::handles(Object *p_object) const {
@@ -182,12 +204,12 @@ void HeightMapEditorPlugin::make_visible(bool p_visible) {
 	_toolbar->set_visible(p_visible);
 }
 
-void HeightMapEditorPlugin::on_mode_selected(int mode) {
+void HeightMapEditorPlugin::_mode_selected(int mode) {
 	ERR_FAIL_COND(mode < 0 || mode >= HeightMapBrush::MODE_COUNT);
 	_brush.set_mode((HeightMapBrush::Mode)mode);
 }
 
-void HeightMapEditorPlugin::on_brush_param_changed(Variant value, int param) {
+void HeightMapEditorPlugin::_brush_param_changed(Variant value, int param) {
 
 	switch (param) {
 		case HeightMapBrushPanel::BRUSH_SIZE:
@@ -210,8 +232,9 @@ void HeightMapEditorPlugin::on_brush_param_changed(Variant value, int param) {
 
 void HeightMapEditorPlugin::_bind_methods() {
 
-	ClassDB::bind_method(D_METHOD("_on_mode_selected", "mode"), &HeightMapEditorPlugin::on_mode_selected);
-	ClassDB::bind_method(D_METHOD("_on_brush_param_changed", "value", "param"), &HeightMapEditorPlugin::on_brush_param_changed);
+	ClassDB::bind_method(D_METHOD("_on_mode_selected", "mode"), &HeightMapEditorPlugin::_mode_selected);
+	ClassDB::bind_method(D_METHOD("_on_brush_param_changed", "value", "param"), &HeightMapEditorPlugin::_brush_param_changed);
+	ClassDB::bind_method(D_METHOD("_height_map_exited_scene"), &HeightMapEditorPlugin::_height_map_exited_scene);
 }
 
 //------------------------------------------

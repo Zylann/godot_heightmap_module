@@ -321,6 +321,8 @@ Error HeightMapDataSaver::save(const String &p_path, const Ref<Resource> &p_reso
 	save_v1(**heightmap_data_ref, *fac);
 
 	fac->close();
+	// TODO I didn't see examples doing this after close()... how is this freed?
+	//memdelete(fac);
 
 	return OK;
 }
@@ -362,6 +364,9 @@ Ref<Resource> HeightMapDataLoader::load(const String &p_path, const String &p_or
 
 	fac->close();
 
+	// TODO I didn't see examples doing this after close()... how is this freed?
+	//memdelete(fac);
+
 	if(r_error)
 		*r_error = OK;
 	return heightmap_data_ref;
@@ -370,9 +375,11 @@ Ref<Resource> HeightMapDataLoader::load(const String &p_path, const String &p_or
 void HeightMapDataLoader::get_recognized_extensions(List<String> *p_extensions) const {
 	p_extensions->push_back(HEIGHTMAP_EXTENSION);
 }
+
 bool HeightMapDataLoader::handles_type(const String &p_type) const {
 	return p_type == "HeightMapData";
 }
+
 String HeightMapDataLoader::get_resource_type(const String &p_path) const {
 	String el = p_path.get_extension().to_lower();
 	if (el == HEIGHTMAP_EXTENSION)

@@ -33,15 +33,18 @@ public:
 	void set_area_dirty(Point2i origin_in_cells, Point2i size_in_cells);
 	bool cell_raycast(Vector3 origin_world, Vector3 dir_world, Point2i &out_cell_pos);
 
+	Vector3 _manual_viewer_pos;
+
 protected:
 	void _notification(int p_what);
 
 private:
 	void _process();
+
 	HeightMapChunk *_make_chunk_cb(Point2i origin, int lod);
 	void _recycle_chunk_cb(HeightMapChunk *chunk);
 
-	void set_chunk_dirty(Point2i pos, int lod);
+	void add_chunk_update(HeightMapChunk &chunk, Point2i pos, int lod);
 	void update_chunk(HeightMapChunk &chunk, int lod);
 
 	Point2i local_pos_to_cell(Vector3 local_pos) const;
@@ -49,11 +52,25 @@ private:
 	void _on_data_resolution_changed();
 	void _on_data_region_changed(int min_x, int min_y, int max_x, int max_y);
 
+	void clear_chunk_cache();
+
+	HeightMapChunk *get_chunk_at(Point2i pos, int lod) const;
+
 	static void _bind_methods();
 
 	static HeightMapChunk *s_make_chunk_cb(void *context, Point2i origin, int lod);
 	static void s_recycle_chunk_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
-	static void s_set_chunk_dirty_cb(void *context, HeightMapChunk *chunk, Point2i origin, int lod);
+
+	template <typename Action_T>
+	void for_all_chunks(Action_T action) {
+		for(int lod = 0; lod < _chunk_cache.size(); ++lod) {
+			const Point2i *key = NULL;
+			while(key = _chunk_cache[lod].next(key)) {
+				HeightMapChunk *chunk = _chunk_cache[lod][*key];
+				action(*chunk);
+			}
+		}
+	}
 
 private:
 	Ref<Material> _material;
@@ -62,9 +79,23 @@ private:
 	HeightMapMesher _mesher;
 	QuadTreeLod<HeightMapChunk *> _lodder;
 
-	// Pending chunk updates indexed by lod
-	// Note: needed Vector<HashSet<Point2i>> but HashSet doesn't exist so I use a placeholder bool.
-	Vector<HashMap<Point2i, bool> > _pending_chunk_updates;
+	struct PendingChunkUpdate {
+		Point2i pos;
+		int lod;
+		PendingChunkUpdate() : lod(0) {}
+	};
+
+	Vector<PendingChunkUpdate> _pending_chunk_updates;
+
+	// [lod][pos]
+	// This container owns chunks, so will be used to free them
+	// TODO Change HashMaps to Grid2D
+	Vector< HashMap< Point2i, HeightMapChunk* > > _chunk_cache;
+
+	//RID _index_arrays[16];
+
+	// Stats
+	int _remeshed_chunks;
 };
 
 #endif // HEIGHT_MAP_H

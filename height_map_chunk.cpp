@@ -1,5 +1,7 @@
 #include "height_map_chunk.h"
 
+//int s_chunk_count = 0;
+
 HeightMapChunk::HeightMapChunk(Spatial *p_parent, Point2i p_cell_pos, Ref<Material> p_material) {
 	cell_origin = p_cell_pos;
 
@@ -20,6 +22,14 @@ HeightMapChunk::HeightMapChunk(Spatial *p_parent, Point2i p_cell_pos, Ref<Materi
 
 	// TODO Is this needed?
 	vs.instance_set_visible(_mesh_instance, true);
+
+	_visible = true;
+	_active = true;
+	_dirty = true;
+	_pending_update = false;
+
+//	++s_chunk_count;
+//	print_line(String("Chunk count: ") + String::num(s_chunk_count));
 }
 
 HeightMapChunk::~HeightMapChunk() {
@@ -30,6 +40,8 @@ HeightMapChunk::~HeightMapChunk() {
 	}
 	//	if(collider)
 	//		collider->queue_delete();
+//	--s_chunk_count;
+//	print_line(String("Chunk count: ") + String::num(s_chunk_count));
 }
 
 void HeightMapChunk::enter_world(World &world) {
