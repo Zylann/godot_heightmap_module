@@ -170,7 +170,7 @@ struct OperatorAdd {
 	void operator()(HeightMapData &data, Point2i pos, float v) {
 		Color c = _im.get_pixel(pos.x, pos.y);
 		c.r += v;
-		_im.put_pixel(pos.x, pos.y, c);
+		_im.set_pixel(pos.x, pos.y, c);
 	}
 };
 
@@ -195,7 +195,7 @@ struct OperatorLerp {
 	void operator()(HeightMapData &data, Point2i pos, float v) {
 		Color c = _im.get_pixel(pos.x, pos.y);
 		c.r = Math::lerp(c.r, target, v);
-		_im.put_pixel(pos.x, pos.y, c);
+		_im.set_pixel(pos.x, pos.y, c);
 	}
 };
 
@@ -210,7 +210,7 @@ struct OperatorLerpColor {
 	void operator()(HeightMapData &data, Point2i pos, float v) {
 		Color c = _im.get_pixel(pos.x, pos.y);
 		c = c.linear_interpolate(target, v);
-		_im.put_pixel(pos.x, pos.y, c);
+		_im.set_pixel(pos.x, pos.y, c);
 	}
 };
 

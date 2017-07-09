@@ -281,7 +281,7 @@ Ref<Texture> HeightMapPreviewGenerator::generate(const Ref<Resource> &p_from) {
 			float gs = CLAMP(0.5*ndot+0.5, 0.0, 1.0);
 			Color col(gs, gs, gs, 1.0);
 
-			im.put_pixel(x, y, col);
+			im.set_pixel(x, y, col);
 		}
 	}
 

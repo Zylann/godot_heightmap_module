@@ -130,7 +130,7 @@ void HeightMapData::update_normals(Point2i min, Point2i size) {
 
 			Vector3 n = Vector3(left - right, 2.0, back - fore).normalized();
 
-			normals.put_pixel(pos.x, pos.y, Color(n.x, n.y, n.z, 0));
+			normals.set_pixel(pos.x, pos.y, Color(n.x, n.y, n.z, 0));
 		}
 	}
 
