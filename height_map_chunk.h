@@ -22,9 +22,6 @@ public:
 	void set_visible(bool visible);
 	bool is_visible() const { return _visible; }
 
-	bool is_dirty() const { return _dirty; }
-	void set_dirty(bool p_dirty) { _dirty = p_dirty; }
-
 	void set_active(bool p_active) { _active = p_active; }
 	bool is_active() const { return _active; }
 
@@ -33,7 +30,6 @@ public:
 
 private:
 	bool _visible;
-	bool _dirty;
 	bool _active;
 	bool _pending_update;
 

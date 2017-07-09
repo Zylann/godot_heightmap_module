@@ -12,8 +12,8 @@ public:
 	enum SeamFlag {
 		SEAM_LEFT = 1,
 		SEAM_RIGHT = 2,
-		SEAM_TOP = 4,
-		SEAM_BOTTOM = 8,
+		SEAM_BOTTOM = 4,
+		SEAM_TOP = 8,
 		SEAM_CONFIG_COUNT = 16
 	};
 

@@ -246,6 +246,39 @@ void HeightMap::_notification(int p_what) {
 	}
 }
 
+//        3
+//      o---o
+//    0 |   | 1
+//      o---o
+//        2
+// Directions to go to neighbor chunks
+Point2i s_dirs[4] = {
+	Point2i(-1, 0), // SEAM_LEFT
+	Point2i(1, 0), // SEAM_RIGHT
+	Point2i(0, -1), // SEAM_BOTTOM
+	Point2i(0, 1) // SEAM_TOP
+};
+
+//       7   6
+//     o---o---o
+//   0 |       | 5
+//     o       o
+//   1 |       | 4
+//     o---o---o
+//       2   3
+//
+// Directions to go to neighbor chunks of higher LOD
+Point2i s_rdirs[8] = {
+	Point2i(-1, 0),
+	Point2i(-1, 1),
+	Point2i(0, 2),
+	Point2i(1, 2),
+	Point2i(2, 1),
+	Point2i(2, 0),
+	Point2i(1, -1),
+	Point2i(0, -1)
+};
+
 void HeightMap::_process() {
 
 	// Get viewer pos
@@ -262,6 +295,44 @@ void HeightMap::_process() {
 		_lodder.update(viewer_pos);
 
 	_updated_chunks = 0;
+
+	// Add more chunk updates for neighboring (seams):
+	// This adds updates to higher-LOD chunks around lower-LOD ones,
+	// because they might not needed to update by themselves, but the fact a neighbor
+	// chunk got joined or split requires them to create or revert seams
+	int precount = _pending_chunk_updates.size();
+	for(int i = 0; i < precount; ++i) {
+		PendingChunkUpdate u = _pending_chunk_updates[i];
+
+		// In case the chunk got split
+		for(int d = 0; d < 4; ++d) {
+
+			Point2i ncpos = u.pos + s_dirs[d];
+			HeightMapChunk *nchunk = get_chunk_at(ncpos, u.lod);
+
+			if(nchunk && nchunk->is_active()) {
+				// Note: this will append elements to the array we are iterating on,
+				// but we iterate only on the previous count so it should be fine
+				add_chunk_update(*nchunk, ncpos, u.lod);
+			}
+		}
+
+		// In case the chunk got joined
+		if(u.lod > 0) {
+			Point2i cpos_upper = u.pos * 2;
+			int nlod = u.lod - 1;
+
+			for(int rd = 0; rd < 8; ++rd) {
+
+				Point2i ncpos_upper = cpos_upper + s_rdirs[rd];
+				HeightMapChunk *nchunk = get_chunk_at(ncpos_upper, nlod);
+
+				if(nchunk && nchunk->is_active()) {
+					add_chunk_update(*nchunk, ncpos_upper, nlod);
+				}
+			}
+		}
+	}
 
 	// Update chunks
 	for(int i = 0; i < _pending_chunk_updates.size(); ++i) {
@@ -283,24 +354,33 @@ void HeightMap::_process() {
 void HeightMap::update_chunk(HeightMapChunk &chunk, int lod) {
 	ERR_FAIL_COND(_data.is_null())
 
-	if(chunk.is_dirty()) {
+	// Check for my own seams
+	int seams = 0;
+	Point2i cpos = chunk.cell_origin / (CHUNK_SIZE << lod);
+	Point2i cpos_lower = cpos / 2;
 
-		// TODO Calculate seams
-		Ref<Mesh> mesh = _mesher.get_chunk(lod, 0);
-		chunk.set_mesh(mesh);
-		chunk.set_dirty(false);
-
-		++_updated_chunks;
+	// Check for lower-LOD chunks around me
+	for(int d = 0; d < 4; ++d) {
+		Point2i ncpos_lower = (cpos + s_dirs[d]) / 2;
+		if(ncpos_lower != cpos_lower) {
+			HeightMapChunk *nchunk = get_chunk_at(ncpos_lower, lod + 1);
+			if(nchunk && nchunk->is_active()) {
+				seams |= (1 << d);
+			}
+		}
 	}
 
-	// TODO Update seams
+	Ref<Mesh> mesh = _mesher.get_chunk(lod, seams);
+	chunk.set_mesh(mesh);
+
+	++_updated_chunks;
 
 	chunk.set_visible(is_visible());
 	chunk.set_pending_update(false);
 
-	if (get_tree()->is_editor_hint() == false) {
-		// TODO Generate collider? Or delegate this to another node
-	}
+//	if (get_tree()->is_editor_hint() == false) {
+//		// TODO Generate collider? Or delegate this to another node
+//	}
 }
 
 void HeightMap::add_chunk_update(HeightMapChunk &chunk, Point2i pos, int lod) {
@@ -348,8 +428,6 @@ void HeightMap::set_area_dirty(Point2i origin_in_cells, Point2i size_in_cells) {
 				if (chunk_ptr) {
 					HeightMapChunk *chunk = *chunk_ptr;
 
-					// Make chunk dirty
-					chunk->set_dirty(true);
 					if(chunk->is_active()) {
 						add_chunk_update(*chunk, cpos, lod);
 					}
@@ -360,23 +438,22 @@ void HeightMap::set_area_dirty(Point2i origin_in_cells, Point2i size_in_cells) {
 }
 
 // Called when a chunk is needed to be seen
-HeightMapChunk *HeightMap::_make_chunk_cb(Point2i origin, int lod) {
+HeightMapChunk *HeightMap::_make_chunk_cb(Point2i cpos, int lod) {
 
-	HeightMapChunk *chunk = get_chunk_at(origin, lod);
+	HeightMapChunk *chunk = get_chunk_at(cpos, lod);
 
 	if(chunk == NULL) {
 
 		// This is the first time this chunk is required at this lod, generate it
 		int lod_factor = _lodder.get_lod_size(lod);
-		Point2i origin_in_cells = origin * CHUNK_SIZE * lod_factor;
+		Point2i origin_in_cells = cpos * CHUNK_SIZE * lod_factor;
 		chunk = memnew(HeightMapChunk(this, origin_in_cells, _material));
-		chunk->set_dirty(true);
-		_chunk_cache[lod][origin] = chunk;
+		_chunk_cache[lod][cpos] = chunk;
 
 	}
 
 	// Make sure it gets updated
-	add_chunk_update(*chunk, origin, lod);
+	add_chunk_update(*chunk, cpos, lod);
 
 	chunk->set_active(true);
 

@@ -101,9 +101,11 @@ PoolVector<int> HeightMapMesher::make_indices(Point2i chunk_size, unsigned int s
 			// 00---10
 
 			// This flips the pattern to make the geometry orientation-free.
-			bool flip = (pos.x + pos.y % 2) % 2 != 0;
+			// Not sure if it helps in any way though
+			bool flip = ((pos.x + reg_origin.x) + (pos.y + reg_origin.y) % 2) % 2 != 0;
 
 			if(flip) {
+
 				output_indices.push_back( i00 );
 				output_indices.push_back( i10 );
 				output_indices.push_back( i01 );
@@ -111,6 +113,7 @@ PoolVector<int> HeightMapMesher::make_indices(Point2i chunk_size, unsigned int s
 				output_indices.push_back( i10 );
 				output_indices.push_back( i11 );
 				output_indices.push_back( i01 );
+
 			} else {
 				output_indices.push_back( i00 );
 				output_indices.push_back( i11 );
@@ -154,13 +157,13 @@ PoolVector<int> HeightMapMesher::make_indices(Point2i chunk_size, unsigned int s
 			output_indices.push_back( i3 );
 			output_indices.push_back( i4 );
 
-			if(j != 0 || seams & SEAM_BOTTOM == 0) {
+			if(j != 0 || (seams & SEAM_BOTTOM) == 0) {
 				output_indices.push_back( i0 );
 				output_indices.push_back( i1 );
 				output_indices.push_back( i3 );
 			}
 
-			if(j != n-1 || seams & SEAM_TOP == 0) {
+			if(j != n-1 || (seams & SEAM_TOP) == 0) {
 				output_indices.push_back( i3 );
 				output_indices.push_back( i5 );
 				output_indices.push_back( i4 );
@@ -197,13 +200,13 @@ PoolVector<int> HeightMapMesher::make_indices(Point2i chunk_size, unsigned int s
 			output_indices.push_back( i5 );
 			output_indices.push_back( i2 );
 
-			if(j != 0 || seams & SEAM_BOTTOM == 0) {
+			if(j != 0 || (seams & SEAM_BOTTOM) == 0) {
 				output_indices.push_back( i0 );
 				output_indices.push_back( i1 );
 				output_indices.push_back( i2 );
 			}
 
-			if(j != n-1 || seams & SEAM_TOP == 0) {
+			if(j != n-1 || (seams & SEAM_TOP) == 0) {
 				output_indices.push_back( i2 );
 				output_indices.push_back( i5 );
 				output_indices.push_back( i4 );
@@ -237,13 +240,13 @@ PoolVector<int> HeightMapMesher::make_indices(Point2i chunk_size, unsigned int s
 			output_indices.push_back( i2 );
 			output_indices.push_back( i4 );
 
-			if(j != 0 || seams & SEAM_LEFT == 0) {
+			if(j != 0 || (seams & SEAM_LEFT) == 0) {
 				output_indices.push_back( i0 );
 				output_indices.push_back( i4 );
 				output_indices.push_back( i3 );
 			}
 
-			if(j != n-1 || seams & SEAM_RIGHT == 0) {
+			if(j != n-1 || (seams & SEAM_RIGHT) == 0) {
 				output_indices.push_back( i2 );
 				output_indices.push_back( i5 );
 				output_indices.push_back( i4 );
@@ -277,13 +280,13 @@ PoolVector<int> HeightMapMesher::make_indices(Point2i chunk_size, unsigned int s
 			output_indices.push_back( i1 );
 			output_indices.push_back( i5 );
 
-			if(j != 0 || seams & SEAM_LEFT == 0) {
+			if(j != 0 || (seams & SEAM_LEFT) == 0) {
 				output_indices.push_back( i0 );
 				output_indices.push_back( i1 );
 				output_indices.push_back( i3 );
 			}
 
-			if(j != n-1 || seams & SEAM_RIGHT == 0) {
+			if(j != n-1 || (seams & SEAM_RIGHT) == 0) {
 				output_indices.push_back( i1 );
 				output_indices.push_back( i2 );
 				output_indices.push_back( i5 );

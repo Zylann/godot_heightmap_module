@@ -52,7 +52,7 @@ private:
 
 	void update_material();
 
-	HeightMapChunk *_make_chunk_cb(Point2i origin, int lod);
+	HeightMapChunk *_make_chunk_cb(Point2i cpos, int lod);
 	void _recycle_chunk_cb(HeightMapChunk *chunk);
 
 	void add_chunk_update(HeightMapChunk &chunk, Point2i pos, int lod);

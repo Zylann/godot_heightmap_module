@@ -25,7 +25,6 @@ HeightMapChunk::HeightMapChunk(Spatial *p_parent, Point2i p_cell_pos, Ref<Materi
 
 	_visible = true;
 	_active = true;
-	_dirty = true;
 	_pending_update = false;
 
 //	++s_chunk_count;
@@ -66,6 +65,8 @@ void HeightMapChunk::parent_transform_changed(const Transform &parent_transform)
 
 void HeightMapChunk::set_mesh(Ref<Mesh> mesh) {
 	ERR_FAIL_COND(_mesh_instance.is_valid() == false);
+	if(mesh == _mesh)
+		return;
 	VisualServer &vs = *VisualServer::get_singleton();
 	vs.instance_set_base(_mesh_instance, mesh.is_valid() ? mesh->get_rid() : RID());
 	_mesh = mesh;
