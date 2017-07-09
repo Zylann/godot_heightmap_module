@@ -90,9 +90,10 @@ bool HeightMapEditorPlugin::forward_spatial_gui_input(Camera *p_camera, const Re
 				_mouse_pressed = false;
 
 			// Need to check modifiers before capturing the event because they are used in navigation schemes
-			if (mb.get_control() == false && mb.get_alt() == false) {
+			if (mb.get_control() == false && mb.get_alt() == false && mb.get_button_index() == BUTTON_LEFT) {
 				if (mb.is_pressed())
 					_mouse_pressed = true;
+
 				captured_event = true;
 
 				if(_mouse_pressed == false) {
@@ -147,11 +148,7 @@ bool HeightMapEditorPlugin::forward_spatial_gui_input(Camera *p_camera, const Re
 		InputEventMouseMotion &mm = **mm_ref;
 		Input &input = *Input::get_singleton();
 
-		if (_brush.get_mode() == HeightMapBrush::MODE_ADD && input.is_mouse_button_pressed(BUTTON_RIGHT)) {
-			paint(*p_camera, mm.get_position(), HeightMapBrush::MODE_SUBTRACT);
-			captured_event = true;
-
-		} else if (input.is_mouse_button_pressed(BUTTON_LEFT)) {
+		if (input.is_mouse_button_pressed(BUTTON_LEFT)) {
 			paint(*p_camera, mm.get_position());
 			captured_event = true;
 		}
