@@ -194,7 +194,6 @@ void HeightMap::update_material() {
 		_material->set_shader_param(SHADER_PARAM_INVERSE_TRANSFORM, t);
 	}
 
-	// TODO Define param names in constants
 	_material->set_shader_param(SHADER_PARAM_HEIGHT_TEXTURE, height_texture);
 	_material->set_shader_param(SHADER_PARAM_NORMAL_TEXTURE, normal_texture);
 	_material->set_shader_param(SHADER_PARAM_COLOR_TEXTURE, color_texture);
