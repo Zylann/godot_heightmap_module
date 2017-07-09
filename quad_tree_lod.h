@@ -98,9 +98,9 @@ public:
 		_max_depth = po;
 	}
 
-	// TODO This returns a maximum, not a count. Would be better for it to be a count (+1)
-	inline int get_lod_count() {
-		return _max_depth;
+	inline int get_lod_count() const {
+		// TODO _max_depth is a maximum, not a count. Would be better for it to be a count (+1)
+		return _max_depth + 1;
 	}
 
 	// The higher, the longer LODs will spread and higher the quality.

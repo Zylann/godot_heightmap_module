@@ -11,7 +11,7 @@ public:
 		MODE_SUBTRACT,
 		MODE_SMOOTH,
 		MODE_FLATTEN,
-		MODE_TEXTURE,
+		//MODE_TEXTURE,
 		MODE_COLOR,
 		MODE_COUNT
 	};
@@ -37,8 +37,10 @@ public:
 	void set_flatten_height(float flatten_height);
 	float get_flatten_height() const { return _flatten_height; }
 
-	void set_texture_index(int tid);
-	int get_texture_index() const { return _texture_index; }
+	static HeightMapData::Channel get_mode_channel(Mode mode);
+
+//	void set_texture_index(int tid);
+//	int get_texture_index() const { return _texture_index; }
 
 	void set_color(Color c);
 	Color get_color() const { return _color; }
@@ -48,7 +50,7 @@ public:
 	UndoData pop_undo_redo_data(const HeightMapData &heightmap_data);
 
 	struct UndoCache {
-		HashMap<Point2i,PoolByteArray> chunks;
+		HashMap< Point2i, Ref<Image> > chunks;
 		void clear() {
 			chunks.clear();
 		}
@@ -60,7 +62,7 @@ private:
 	void paint_height(HeightMapData &data, Point2i cell_pos, float speed);
 	void smooth_height(HeightMapData &data, Point2i cell_pos, float speed);
 	void flatten_height(HeightMapData &data, Point2i cell_pos);
-	void paint_indexed_texture(HeightMapData &data, Point2i cell_pos);
+	//void paint_indexed_texture(HeightMapData &data, Point2i cell_pos);
 	void paint_color(HeightMapData &data, Point2i cell_pos);
 
 private:
@@ -70,7 +72,7 @@ private:
 	float _shape_sum;
 	Mode _mode;
 	float _flatten_height;
-	int _texture_index;
+	//int _texture_index;
 	Color _color;
 	UndoCache _undo_cache;
 };

@@ -1,7 +1,9 @@
 #include <core/os/file_access.h>
 #include <core/io/file_access_compressed.h>
 #include <core/array.h>
+
 #include "height_map.h"
+#include "utility.h"
 
 #define DEFAULT_RESOLUTION 256
 #define HEIGHTMAP_EXTENSION "heightmap"
@@ -9,11 +11,21 @@
 const char *HeightMapData::SIGNAL_RESOLUTION_CHANGED = "resolution_changed";
 const char *HeightMapData::SIGNAL_REGION_CHANGED = "region_changed";
 
+const int HeightMapData::MAX_RESOLUTION = 4096 + 1;
+
+// For serialization
+const char *HEIGHTMAP_MAGIC_V1 = "GDHM";
+//const char *HEIGHTMAP_SUB_V1 = "v1__";
+const char *HEIGHTMAP_SUB_V = "v2__";
+
 
 HeightMapData::HeightMapData() {
-#ifdef TOOLS_ENABLED
+
+	_resolution = 0;
+
+//#ifdef TOOLS_ENABLED
 	_disable_apply_undo = false;
-#endif
+//#endif
 }
 
 void HeightMapData::load_default() {
@@ -23,7 +35,7 @@ void HeightMapData::load_default() {
 }
 
 int HeightMapData::get_resolution() const {
-	return heights.size().x;
+	return _resolution;
 }
 
 void HeightMapData::set_resolution(int p_res) {
@@ -39,49 +51,114 @@ void HeightMapData::set_resolution(int p_res) {
 	// because for an even number of quads you need an odd number of vertices
 	p_res = nearest_power_of_2(p_res - 1) + 1;
 
-	Point2i size(p_res, p_res);
-	heights.resize(size, true, 0);
-	normals.resize(size, true, Vector3(0, 1, 0));
-	colors.resize(size, true, Color(1, 1, 1, 1));
+	_resolution = p_res;
 
-	for (int i = 0; i < TEXTURE_INDEX_COUNT; ++i) {
-		// Sum of all weights must be 1, so we fill first slot with 1 and others with 0
-		texture_weights[i].resize(size, true, i == 0 ? 1 : 0);
-		texture_indices[i].resize(size, true, 0);
+	// Resize heights
+	if(_images[CHANNEL_HEIGHT].is_null()) {
+		_images[CHANNEL_HEIGHT].instance();
+		_images[CHANNEL_HEIGHT]->create(_resolution, _resolution, false, get_channel_format(CHANNEL_HEIGHT));
+	} else {
+		_images[CHANNEL_HEIGHT]->resize(_resolution, _resolution);
 	}
+
+	// Resize heights
+	if(_images[CHANNEL_NORMAL].is_null()) {
+		_images[CHANNEL_NORMAL].instance();
+	}
+	_images[CHANNEL_NORMAL]->create(_resolution, _resolution, false, get_channel_format(CHANNEL_NORMAL));
+	update_all_normals();
+
+	// Resize colors
+	if(_images[CHANNEL_COLOR].is_null()) {
+		_images[CHANNEL_COLOR].instance();
+		_images[CHANNEL_COLOR]->create(_resolution, _resolution, false, get_channel_format(CHANNEL_COLOR));
+	} else {
+		_images[CHANNEL_COLOR]->resize(_resolution, _resolution);
+	}
+
+//	for (int i = 0; i < TEXTURE_INDEX_COUNT; ++i) {
+//		// Sum of all weights must be 1, so we fill first slot with 1 and others with 0
+//		texture_weights[i].resize(size, true, i == 0 ? 1 : 0);
+//		texture_indices[i].resize(size, true, 0);
+//	}
 
 	emit_signal(SIGNAL_RESOLUTION_CHANGED);
 }
 
 void HeightMapData::update_all_normals() {
-	update_normals(Point2i(), heights.size());
+	update_normals(Point2i(), Point2i(_resolution, _resolution));
+}
+
+inline Color get_clamped(const Image &im, int x, int y) {
+
+	if (x < 0)
+		x = 0;
+	if (y < 0)
+		y = 0;
+
+	if (x >= im.get_width())
+		x = im.get_width() - 1;
+	if (y >= im.get_height())
+		y = im.get_height() - 1;
+
+	return im.get_pixel(x, y);
 }
 
 void HeightMapData::update_normals(Point2i min, Point2i size) {
 
+	ERR_FAIL_COND(_images[CHANNEL_HEIGHT].is_null());
+	ERR_FAIL_COND(_images[CHANNEL_NORMAL].is_null());
+
+	Image &heights = **_images[CHANNEL_HEIGHT];
+	Image &normals = **_images[CHANNEL_NORMAL];
+
 	Point2i max = min + size;
 	Point2i pos;
 
-	heights.clamp_min_max_excluded(min, max);
+	clamp_min_max_excluded(min, max, Point2i(0,0), Point2i(heights.get_width(), heights.get_height()));
+
+	heights.lock();
+	normals.lock();
 
 	for (pos.y = min.y; pos.y < max.y; ++pos.y) {
 		for (pos.x = min.x; pos.x < max.x; ++pos.x) {
 
-			float left = heights.get_clamped(pos.x - 1, pos.y);
-			float right = heights.get_clamped(pos.x + 1, pos.y);
-			float fore = heights.get_clamped(pos.x, pos.y + 1);
-			float back = heights.get_clamped(pos.x, pos.y - 1);
+			float left = get_clamped(heights, pos.x - 1, pos.y).r;
+			float right = get_clamped(heights, pos.x + 1, pos.y).r;
+			float fore = get_clamped(heights, pos.x, pos.y + 1).r;
+			float back = get_clamped(heights, pos.x, pos.y - 1).r;
 
-			normals.set(pos, Vector3(left - right, 2.0, back - fore).normalized());
+			Vector3 n = Vector3(left - right, 2.0, back - fore).normalized();
+
+			normals.put_pixel(pos.x, pos.y, Color(n.x, n.y, n.z, 0));
 		}
 	}
+
+	heights.unlock();
+	normals.unlock();
 }
 
-void HeightMapData::notify_region_change(Point2i min, Point2i max) {
-	emit_signal(SIGNAL_REGION_CHANGED, min.x, min.y, max.x, max.y);
+void HeightMapData::notify_region_change(Point2i min, Point2i max, HeightMapData::Channel channel) {
+
+	// TODO Hmm not sure if that belongs here
+	switch(channel) {
+		case CHANNEL_HEIGHT:
+			upload_region(channel, min, max);
+			upload_region(CHANNEL_NORMAL, min, max);
+			break;
+		case CHANNEL_NORMAL:
+		case CHANNEL_COLOR:
+			upload_region(channel, min, max);
+			break;
+		default:
+			print_line("Unrecognized channel");
+			break;
+	}
+
+	emit_signal(SIGNAL_REGION_CHANGED, min.x, min.y, max.x, max.y, channel);
 }
 
-#ifdef TOOLS_ENABLED
+//#ifdef TOOLS_ENABLED
 
 // Very specific to the editor.
 // undo_data contains chunked grids of modified terrain in a given channel.
@@ -89,6 +166,7 @@ void HeightMapData::_apply_undo(Dictionary undo_data) {
 
 	if(_disable_apply_undo)
 		return;
+	// TODO Update to use images
 
 	Array chunk_positions = undo_data["chunk_positions"];
 	Array chunk_datas = undo_data["data"];
@@ -119,40 +197,103 @@ void HeightMapData::_apply_undo(Dictionary undo_data) {
 		Point2i min = cpos * HeightMap::CHUNK_SIZE;
 		Point2i max = min + Point2i(1, 1) * HeightMap::CHUNK_SIZE;
 
-		PoolByteArray data = chunk_datas[i];
+		Ref<Image> data = chunk_datas[i];
+		ERR_FAIL_COND(data.is_null());
+
+		Rect2 data_rect(0, 0, data->get_width(), data->get_height());
 
 		switch(channel) {
 
-			case HeightMapData::CHANNEL_HEIGHT:
-				heights.apply_dump(data, min, max);
+			case CHANNEL_HEIGHT:
+				ERR_FAIL_COND(_images[channel].is_null())
+				_images[channel]->blit_rect(data, data_rect, min);
 				// Padding is needed because normals are calculated using neighboring,
 				// so a change in height X also requires normals in X-1 and X+1 to be updated
 				update_normals(min - Point2i(1,1), max + Point2i(1,1));
 				break;
 
-			case HeightMapData::CHANNEL_COLOR:
-				colors.apply_dump(data, min, max);
+			case CHANNEL_COLOR:
+				ERR_FAIL_COND(_images[channel].is_null())
+				_images[channel]->blit_rect(data, data_rect, min);
 				break;
 
-			// TODO Texture paint undo
+			case CHANNEL_NORMAL:
+				print_line("This is a calculated channel!, no undo on this one");
+				break;
 
 			default:
 				print_line("Wut? Unsupported undo channel");
 				break;
 		}
 
-		notify_region_change(min, max);
+		// TODO This one might be very slow even with partial texture update, due to rebinding...?
+		notify_region_change(min, max, (Channel)channel);
 	}
 }
 
-#endif
+//#endif
+
+void HeightMapData::upload_channel(Channel channel) {
+	upload_region(channel, Point2i(0,0), Point2i(_resolution, _resolution));
+}
+
+void HeightMapData::upload_region(Channel channel, Point2i min, Point2i max) {
+
+	ERR_FAIL_COND(_images[channel].is_null());
+
+	if(_textures[channel].is_null()) {
+		_textures[channel].instance();
+	}
+
+	//               ..ooo@@@XXX%%%xx..
+	//            .oo@@XXX%x%xxx..     ` .
+	//          .o@XX%%xx..               ` .
+	//        o@X%..                  ..ooooooo
+	//      .@X%x.                 ..o@@^^   ^^@@o
+	//    .ooo@@@@@@ooo..      ..o@@^          @X%
+	//    o@@^^^     ^^^@@@ooo.oo@@^             %
+	//   xzI    -*--      ^^^o^^        --*-     %
+	//   @@@o     ooooooo^@@^o^@X^@oooooo     .X%x
+	//  I@@@@@@@@@XX%%xx  ( o@o )X%x@ROMBASED@@@X%x
+	//  I@@@@XX%%xx  oo@@@@X% @@X%x   ^^^@@@@@@@X%x
+	//   @X%xx     o@@@@@@@X% @@XX%%x  )    ^^@X%x
+	//    ^   xx o@@@@@@@@Xx  ^ @XX%%x    xxx
+	//          o@@^^^ooo I^^ I^o ooo   .  x
+	//          oo @^ IX      I   ^X  @^ oo
+	//          IX     U  .        V     IX
+	//           V     .           .     V
+	//
+	// TODO Partial update pleaaase! SLOOOOOOOOOOWNESS AHEAD !!
+	_textures[channel]->create_from_image(_images[channel], 0);
+	//print_line(String("Channel updated ") + String::num(channel));
+}
+
+Ref<Image> HeightMapData::get_image(Channel channel) const {
+	return _images[channel];
+}
+
+Ref<Texture> HeightMapData::get_texture(Channel channel) {
+	if(_textures[channel].is_null() && _images[channel].is_valid()) {
+		upload_channel(channel);
+	}
+	return _textures[channel];
+}
+
+Vector3 HeightMapData::decode_normal(Color c) {
+	return Vector3(
+		2.f * c.r - 1.f,
+		2.f * c.g - 1.f,
+		2.f * c.b - 1.f);
+}
 
 void HeightMapData::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_resolution", "p_res"), &HeightMapData::set_resolution);
 	ClassDB::bind_method(D_METHOD("get_resolution"), &HeightMapData::get_resolution);
 
+//#ifdef TOOLS_ENABLED
 	ClassDB::bind_method(D_METHOD("_apply_undo", "data"), &HeightMapData::_apply_undo);
+//#endif
 
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "resolution"), "set_resolution", "get_resolution");
 
@@ -161,105 +302,91 @@ void HeightMapData::_bind_methods() {
 						  PropertyInfo(Variant::INT, "min_x"),
 						  PropertyInfo(Variant::INT, "min_y"),
 						  PropertyInfo(Variant::INT, "max_x"),
-						  PropertyInfo(Variant::INT, "max_y")));
+						  PropertyInfo(Variant::INT, "max_y"),
+						  PropertyInfo(Variant::INT, "channel")));
 }
 
-
-//---------------------------------------
-// Serialization
-
-const char *HEIGHTMAP_MAGIC_V1 = "GDHM";
-const char *HEIGHTMAP_SUB_V1 = "v1__";
-
-inline uint8_t encode_normal(float n) {
-	return CLAMP(static_cast<int>(n * 127.f) + 127, 0, 255);
-}
-
-inline float decode_normal(uint8_t n) {
-	return static_cast<float>(n) / 127.f - 1.f;
-}
-
-inline uint16_t encode_quantified(float h, float hmin, float hrange) {
-	return CLAMP(static_cast<int>(65535.f * (h - hmin) / hrange), 0, 65535);
-}
-
-inline float decode_quantified(uint16_t h, float hmin, float hrange) {
-	return (static_cast<float>(h) / 65535.f) * hrange + hmin;
-}
-
-template <typename T>
-void find_min_max(const T *data, int len, T& out_min, T& out_max) {
-
-	if(len <= 0)
-		return;
-
-	T min = data[0];
-	T max = min;
-
-	for(int i = 1; i < len; ++i) {
-		T v = data[i];
-		if(v > max)
-			max = v;
-		else if(v < min)
-			min = v;
+Image::Format HeightMapData::get_channel_format(Channel channel) {
+	switch(channel) {
+		case CHANNEL_HEIGHT:
+			return Image::FORMAT_RH;
+		case CHANNEL_NORMAL:
+			return Image::FORMAT_RGB8;
+		case CHANNEL_COLOR:
+			return Image::FORMAT_RGBA8;
 	}
-
-	out_min = min;
-	out_max = max;
+	print_line("Unrecognized channel");
+	return Image::FORMAT_MAX;
 }
 
-static void save_v1(HeightMapData &data, FileAccess &f) {
+static void write_channel(FileAccess &f, Ref<Image> img_ref) {
+
+	PoolVector<uint8_t> data = img_ref->get_data();
+	PoolVector<uint8_t>::Read r = data.read();
+
+	f.store_buffer(r.ptr(), data.size());
+}
+
+Error HeightMapData::_save(FileAccess &f) {
 
 	// Sub-version
-	f.store_buffer((const uint8_t*)HEIGHTMAP_SUB_V1, 4);
+	f.store_buffer((const uint8_t*)HEIGHTMAP_SUB_V, 4);
 
 	// Size
-	f.store_32(data.heights.size().x);
-	f.store_32(data.heights.size().y);
+	//print_line(String("String saving resolution ") + String::num(_resolution));
+	f.store_32(_resolution);
+	f.store_32(_resolution);
 
-	int area = data.heights.area();
+	for(int channel = 0; channel < CHANNEL_COUNT; ++channel) {
 
-	// Vertical bounds
-	float hmin = 0.f;
-	float hmax = 0.f;
-	find_min_max(data.heights.raw(), area, hmin, hmax);
-	f.store_float(hmin);
-	f.store_float(hmax);
+		Ref<Image> im = _images[channel];
+		//print_line(String("Saving channel ") + String::num(channel));
 
-	// Heights
-	float hrange = hmax - hmin;
-	for(int i = 0; i < area; ++i) {
-		float h = data.heights[i];
-		uint16_t eh = encode_quantified(h, hmin, hrange);
-		f.store_16(eh);
-	}
+		// Sanity checks
+		ERR_FAIL_COND_V(im.is_null(), ERR_FILE_CORRUPT);
+		ERR_FAIL_COND_V(im->get_width() != _resolution || im->get_height() != _resolution, ERR_FILE_CORRUPT);
 
-	// Normals
-	for(int i = 0; i < area; ++i) {
-		Vector3 n = data.normals[i];
-		f.store_8(encode_normal(n.x));
-		f.store_8(encode_normal(n.y));
-		f.store_8(encode_normal(n.z));
-	}
-
-	// Colors
-	for(int i = 0; i < area; ++i) {
-		Color c = data.colors[i];
-		f.store_32(c.to_32());
+		write_channel(f, _images[channel]);
 	}
 
 	// TODO Texture indices
 	// TODO Texture weights
 
+	return OK;
 }
 
-static Error load_v1(HeightMapData &data, FileAccess &f) {
+static void load_channel(Ref<Image> &img_ref, int channel, FileAccess &f, Point2i size) {
+
+	if(img_ref.is_null()) {
+		img_ref.instance();
+	}
+
+	Image::Format format = HeightMapData::get_channel_format((HeightMapData::Channel)channel);
+	ERR_FAIL_COND(format == Image::FORMAT_MAX);
+
+	//img_ref->create(size.x, size.y, false, format);
+	// I can't create the image before because getting the data array afterwards will increase refcount to 2.
+	// Because of this, using a Write to set the bytes will trigger copy-on-write, which will:
+	// 1) Needlessly double the amount of memory needed to load the image, and that image can be big
+	// 2) Loose any loaded data because it gets loaded on a copy, not the actual image
+
+	PoolVector<uint8_t> data;
+	data.resize(Image::get_image_data_size(size.x, size.y, format, false));
+	PoolVector<uint8_t>::Write w = data.write();
+
+	//print_line(String("Load channel {0}, size={1}").format(varray(channel, data.size())));
+	f.get_buffer(w.ptr(), data.size());
+
+	img_ref->create(size.x, size.y, false, format, data);
+}
+
+Error HeightMapData::_load(FileAccess &f) {
 
 	char version[5] = {0};
 	f.get_buffer((uint8_t*)version, 4);
 
-	if(strncmp(version, HEIGHTMAP_SUB_V1, 4) != 0) {
-		print_line(String("Invalid version, found {0}").format(varray(version)));
+	if(strncmp(version, HEIGHTMAP_SUB_V, 4) != 0) {
+		print_line(String("Invalid version, found {0}, expected {1}").format(varray(version, HEIGHTMAP_SUB_V)));
 		return ERR_FILE_UNRECOGNIZED;
 	}
 
@@ -267,30 +394,16 @@ static Error load_v1(HeightMapData &data, FileAccess &f) {
 	size.x = f.get_32();
 	size.y = f.get_32();
 
-	int area = size.x * size.y;
+	// Note: maybe one day we'll support non-square heightmaps
+	_resolution = size.x;
+	size.y = size.x;
+	//print_line(String("Loaded resolution ") + String::num(_resolution));
 
-	// Note: maybe some day non-square resolution will be supported
-	data.set_resolution(size.x);
+	ERR_FAIL_COND_V(size.x >= MAX_RESOLUTION, ERR_FILE_CORRUPT);
+	ERR_FAIL_COND_V(size.y >= MAX_RESOLUTION, ERR_FILE_CORRUPT);
 
-	float hmin = f.get_float();
-	float hmax = f.get_float();
-
-	float hrange = hmax - hmin;
-	for(int i = 0; i < area; ++i) {
-		data.heights[i] = decode_quantified(f.get_16(), hmin, hrange);
-	}
-
-	for(int i = 0; i < area; ++i) {
-		Vector3 n;
-		n.x = decode_normal(f.get_8());
-		n.y = decode_normal(f.get_8());
-		n.z = decode_normal(f.get_8());
-		data.normals[i] = n;
-	}
-
-	for(int i = 0; i < area; ++i) {
-		Color c = Color::hex(f.get_32());
-		data.colors[i] = c;
+	for(int channel = 0; channel < CHANNEL_COUNT; ++channel) {
+		load_channel(_images[channel], channel, f, size);
 	}
 
 	// TODO Texture indices
@@ -304,7 +417,7 @@ static Error load_v1(HeightMapData &data, FileAccess &f) {
 // Saver
 
 Error HeightMapDataSaver::save(const String &p_path, const Ref<Resource> &p_resource, uint32_t p_flags) {
-	print_line("Saving heightmap data");
+	//print_line("Saving heightmap data");
 
 	Ref<HeightMapData> heightmap_data_ref = p_resource;
 	ERR_FAIL_COND_V(heightmap_data_ref.is_null(), ERR_BUG);
@@ -313,18 +426,18 @@ Error HeightMapDataSaver::save(const String &p_path, const Ref<Resource> &p_reso
 	fac->configure(HEIGHTMAP_MAGIC_V1);
 	Error err = fac->_open(p_path, FileAccess::WRITE);
 	if (err) {
-		print_line("Error saving heightmap data");
+		//print_line("Error saving heightmap data");
 		memdelete(fac);
 		return err;
 	}
 
-	save_v1(**heightmap_data_ref, *fac);
+	Error e = heightmap_data_ref->_save(*fac);
 
 	fac->close();
 	// TODO I didn't see examples doing this after close()... how is this freed?
 	//memdelete(fac);
 
-	return OK;
+	return e;
 }
 
 bool HeightMapDataSaver::recognize(const Ref<Resource> &p_resource) const {
@@ -342,23 +455,26 @@ void HeightMapDataSaver::get_recognized_extensions(const Ref<Resource> &p_resour
 // Loader
 
 Ref<Resource> HeightMapDataLoader::load(const String &p_path, const String &p_original_path, Error *r_error) {
-	print_line("Loading heightmap data");
+	//print_line("Loading heightmap data");
 
 	FileAccessCompressed *fac = memnew(FileAccessCompressed);
 	fac->configure(HEIGHTMAP_MAGIC_V1);
 	Error err = fac->_open(p_path, FileAccess::READ);
 	if (err) {
-		print_line("Error loading heightmap data");
+		//print_line("Error loading heightmap data");
+		if(r_error)
+			*r_error = err;
 		memdelete(fac);
-		return err;
+		return Ref<Resource>();
 	}
 
 	Ref<HeightMapData> heightmap_data_ref(memnew(HeightMapData));
 
-	err = load_v1(**heightmap_data_ref, *fac);
+	err = heightmap_data_ref->_load(*fac);
 	if(err != OK) {
 		if(r_error)
 			*r_error = err;
+		memdelete(fac);
 		return Ref<Resource>();
 	}
 

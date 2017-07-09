@@ -15,14 +15,20 @@ public:
 	// Workaround because GCC doesn't links the line above properly
 	enum { CHUNK_SIZE = 16 };
 
+	static const char *SHADER_PARAM_HEIGHT_TEXTURE;
+	static const char *SHADER_PARAM_NORMAL_TEXTURE;
+	static const char *SHADER_PARAM_COLOR_TEXTURE;
+	static const char *SHADER_PARAM_RESOLUTION;
+	static const char *SHADER_PARAM_INVERSE_TRANSFORM;
+
 	HeightMap();
 	~HeightMap();
 
 	void set_data(Ref<HeightMapData> data);
 	Ref<HeightMapData> get_data() { return _data; }
 
-	void set_material(Ref<Material> p_material);
-	inline Ref<Material> get_material() const { return _material; }
+	void set_custom_shader(Ref<Shader> p_shader);
+	inline Ref<Shader> get_custom_shader() const { return _custom_shader; }
 
 	void set_collision_enabled(bool enabled);
 	inline bool is_collision_enabled() const { return _collision_enabled; }
@@ -33,6 +39,9 @@ public:
 	void set_area_dirty(Point2i origin_in_cells, Point2i size_in_cells);
 	bool cell_raycast(Vector3 origin_world, Vector3 dir_world, Point2i &out_cell_pos);
 
+	static void init_default_resources();
+	static void free_default_resources();
+
 	Vector3 _manual_viewer_pos;
 
 protected:
@@ -40,6 +49,8 @@ protected:
 
 private:
 	void _process();
+
+	void update_material();
 
 	HeightMapChunk *_make_chunk_cb(Point2i origin, int lod);
 	void _recycle_chunk_cb(HeightMapChunk *chunk);
@@ -50,7 +61,7 @@ private:
 	Point2i local_pos_to_cell(Vector3 local_pos) const;
 
 	void _on_data_resolution_changed();
-	void _on_data_region_changed(int min_x, int min_y, int max_x, int max_y);
+	void _on_data_region_changed(int min_x, int min_y, int max_x, int max_y, int channel);
 
 	void clear_chunk_cache();
 
@@ -73,7 +84,8 @@ private:
 	}
 
 private:
-	Ref<Material> _material;
+	Ref<Shader> _custom_shader;
+	Ref<ShaderMaterial> _material;
 	bool _collision_enabled;
 	Ref<HeightMapData> _data;
 	HeightMapMesher _mesher;
@@ -92,10 +104,8 @@ private:
 	// TODO Change HashMaps to Grid2D
 	Vector< HashMap< Point2i, HeightMapChunk* > > _chunk_cache;
 
-	//RID _index_arrays[16];
-
 	// Stats
-	int _remeshed_chunks;
+	int _updated_chunks;
 };
 
 #endif // HEIGHT_MAP_H

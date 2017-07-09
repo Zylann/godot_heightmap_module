@@ -12,7 +12,6 @@ public:
 	HeightMapChunk(Spatial *p_parent, Point2i p_cell_pos, Ref<Material> p_material);
 	~HeightMapChunk();
 
-	void create(Point2i pos, Ref<Material> material);
 	void set_mesh(Ref<Mesh> mesh);
 	void clear();
 	void set_material(Ref<Material> material);

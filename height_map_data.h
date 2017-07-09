@@ -7,22 +7,26 @@
 #include <core/io/resource_loader.h>
 #include <core/io/resource_saver.h>
 #include <core/dictionary.h>
+#include <scene/resources/texture.h>
+#include <core/os/file_access.h>
 
 #include "grid.h"
 
 class HeightMapData : public Resource {
 	GDCLASS(HeightMapData, Resource)
 public:
-	enum { TEXTURE_INDEX_COUNT = 4 };
+	//enum { TEXTURE_INDEX_COUNT = 4 };
 
 	enum Channel {
 		CHANNEL_HEIGHT = 0,
 		CHANNEL_NORMAL,
 		CHANNEL_COLOR,
-		CHANNEL_TEXTURE_WEIGHT,
-		CHANNEL_TEXTURE_INDEX,
+//		CHANNEL_TEXTURE_WEIGHT,
+//		CHANNEL_TEXTURE_INDEX,
 		CHANNEL_COUNT
 	};
+
+	static const int MAX_RESOLUTION;
 
 	static const char *SIGNAL_RESOLUTION_CHANGED;
 	static const char *SIGNAL_REGION_CHANGED;
@@ -37,28 +41,37 @@ public:
 	void update_all_normals();
 	void update_normals(Point2i min, Point2i size);
 
-	void notify_region_change(Point2i min, Point2i max);
+	void notify_region_change(Point2i min, Point2i max, Channel channel);
 
-	// Public for convenience.
-	// Do not attempt to resize them!
-	Grid2D<float> heights;
-	Grid2D<Vector3> normals;
-	Grid2D<Color> colors;
-	Grid2D<float> texture_weights[TEXTURE_INDEX_COUNT];
-	Grid2D<char> texture_indices[TEXTURE_INDEX_COUNT];
+	Ref<Texture> get_texture(Channel channel);
+	Ref<Image> get_image(Channel channel) const;
 
-#ifdef TOOLS_ENABLED
+	static Vector3 decode_normal(Color c);
+	static Image::Format get_channel_format(Channel channel);
+
+	Error _load(FileAccess &f);
+	Error _save(FileAccess &f);
+
+//#ifdef TOOLS_ENABLED
 	bool _disable_apply_undo;
-#endif
+//#endif
 
 private:
 
-#ifdef TOOLS_ENABLED
+//#ifdef TOOLS_ENABLED
 	void _apply_undo(Dictionary undo_data);
-#endif
+//#endif
+
+	static void _bind_methods();
+
+	void upload_channel(Channel channel);
+	void upload_region(Channel channel, Point2i min, Point2i max);
 
 private:
-	static void _bind_methods();
+	int _resolution;
+
+	Ref<ImageTexture> _textures[CHANNEL_COUNT];
+	Ref<Image> _images[CHANNEL_COUNT];
 };
 
 
@@ -77,6 +90,8 @@ public:
 	bool handles_type(const String &p_type) const;
 	String get_resource_type(const String &p_path) const;
 };
+
+VARIANT_ENUM_CAST(HeightMapData::Channel)
 
 
 #endif // HEIGHT_MAP_DATA_H

@@ -34,14 +34,14 @@ HeightMapEditorPlugin::HeightMapEditorPlugin(EditorNode *p_editor) {
 	mode_icons[HeightMapBrush::MODE_SUBTRACT] = get_icon("AnimGet");
 	mode_icons[HeightMapBrush::MODE_SMOOTH] = get_icon("SphereShape");
 	mode_icons[HeightMapBrush::MODE_FLATTEN] = get_icon("HSize");
-	mode_icons[HeightMapBrush::MODE_TEXTURE] = get_icon("ImmediateGeometry");
+	//mode_icons[HeightMapBrush::MODE_TEXTURE] = get_icon("ImmediateGeometry");
 
 	String mode_tooltip[HeightMapBrush::MODE_COUNT];
 	mode_tooltip[HeightMapBrush::MODE_ADD] = TTR("Add");
 	mode_tooltip[HeightMapBrush::MODE_SUBTRACT] = TTR("Subtract");
 	mode_tooltip[HeightMapBrush::MODE_SMOOTH] = TTR("Smooth");
 	mode_tooltip[HeightMapBrush::MODE_FLATTEN] = TTR("Flatten");
-	mode_tooltip[HeightMapBrush::MODE_TEXTURE] = TTR("Texture paint");
+	//mode_tooltip[HeightMapBrush::MODE_TEXTURE] = TTR("Texture paint");
 	mode_tooltip[HeightMapBrush::MODE_COLOR] = TTR("Color paint");
 
 	_toolbar->add_child(memnew(VSeparator));
@@ -250,8 +250,12 @@ Ref<Texture> HeightMapPreviewGenerator::generate(const Ref<Resource> &p_from) {
 	ERR_FAIL_COND_V(data_ref.is_null(), Ref<Texture>());
 	HeightMapData &data = **data_ref;
 
-	if(data.heights.size().x == 0 || data.heights.size().y == 0)
+	if(data.get_resolution() == 0)
 		return Ref<Texture>();
+
+	Ref<Image> normals_ref = data.get_image(HeightMapData::CHANNEL_NORMAL);
+	ERR_FAIL_COND_V(normals_ref.is_null(), Ref<Texture>());
+	Image &normals = **normals_ref;
 
 	int thumbnail_size = EditorSettings::get_singleton()->get("filesystem/file_dialog/thumbnail_size");
 	thumbnail_size *= EDSCALE;
@@ -262,6 +266,7 @@ Ref<Texture> HeightMapPreviewGenerator::generate(const Ref<Resource> &p_from) {
 	im.create(thumbnail_size, thumbnail_size, 0, Image::FORMAT_RGBA8);
 
 	im.lock();
+	normals.lock();
 
 	Vector3 light_dir = Vector3(-1, -0.5, -1).normalized();
 
@@ -270,9 +275,11 @@ Ref<Texture> HeightMapPreviewGenerator::generate(const Ref<Resource> &p_from) {
 
 			float fx = static_cast<float>(x) / im.get_width();
 			float fy = static_cast<float>(im.get_height() - y - 1) / im.get_height();
-			Point2i mpos(fx * data.heights.size().x, fy * data.heights.size().y);
+			Point2i mpos(fx * normals.get_width(),
+						 fy * normals.get_height());
 
-			Vector3 n = data.normals.get(mpos);
+			Vector3 n = HeightMapData::decode_normal(normals.get_pixel(mpos.x, mpos.y));
+
 			float ndot = -n.dot(light_dir);
 			float gs = CLAMP(0.5*ndot+0.5, 0.0, 1.0);
 			Color col(gs, gs, gs, 1.0);
@@ -282,6 +289,7 @@ Ref<Texture> HeightMapPreviewGenerator::generate(const Ref<Resource> &p_from) {
 	}
 
 	im.unlock();
+	normals.unlock();
 
 	Ref<ImageTexture> ptex = Ref<ImageTexture>(memnew(ImageTexture));
 

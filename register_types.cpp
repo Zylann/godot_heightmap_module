@@ -17,6 +17,8 @@ void register_hterrain_types() {
 	ClassDB::register_class<HeightMap>();
 	ClassDB::register_class<HeightMapData>();
 
+	HeightMap::init_default_resources();
+
 	s_heightmap_data_saver = memnew(HeightMapDataSaver());
 	ResourceSaver::add_resource_format_saver(s_heightmap_data_saver);
 
@@ -32,6 +34,9 @@ void register_hterrain_types() {
 void unregister_hterrain_types() {
 
 #ifndef _3D_DISABLED
+
+	HeightMap::free_default_resources();
+
 	if(s_heightmap_data_saver) {
 		memdelete(s_heightmap_data_saver);
 	}

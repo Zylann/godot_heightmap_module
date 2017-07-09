@@ -1,4 +1,5 @@
 #include "height_map_brush.h"
+#include "utility.h"
 
 HeightMapBrush::HeightMapBrush() {
 	_opacity = 1;
@@ -6,7 +7,7 @@ HeightMapBrush::HeightMapBrush() {
 	_shape_sum = 0;
 	_mode = MODE_ADD;
 	_flatten_height = 0;
-	_texture_index = 0;
+	//_texture_index = 0;
 	_color = Color(1, 0, 0, 0);
 }
 
@@ -38,10 +39,10 @@ void HeightMapBrush::set_flatten_height(float flatten_height) {
 	_flatten_height = flatten_height;
 }
 
-void HeightMapBrush::set_texture_index(int tid) {
-	ERR_FAIL_COND(tid < 0);
-	_texture_index = tid;
-}
+//void HeightMapBrush::set_texture_index(int tid) {
+//	ERR_FAIL_COND(tid < 0);
+//	_texture_index = tid;
+//}
 
 void HeightMapBrush::set_color(Color c) {
 	// Color might be useful for custom shading
@@ -69,6 +70,22 @@ void HeightMapBrush::generate_procedural(int radius) {
 	}
 }
 
+HeightMapData::Channel HeightMapBrush::get_mode_channel(Mode mode) {
+	switch(mode) {
+	case MODE_ADD:
+	case MODE_SUBTRACT:
+	case MODE_SMOOTH:
+	case MODE_FLATTEN:
+		return HeightMapData::CHANNEL_HEIGHT;
+	case MODE_COLOR:
+		return HeightMapData::CHANNEL_COLOR;
+	default:
+		print_line("This mode has no channel");
+		break;
+	}
+	return HeightMapData::CHANNEL_COUNT; // Error
+}
+
 void HeightMapBrush::paint(HeightMap &height_map, Point2i cell_pos, int override_mode) {
 
 	ERR_FAIL_COND(height_map.get_data().is_null());
@@ -83,6 +100,7 @@ void HeightMapBrush::paint(HeightMap &height_map, Point2i cell_pos, int override
 	}
 
 	Point2i origin = cell_pos - _shape.size() / 2;
+	HeightMapData::Channel channel = HeightMapData::CHANNEL_COUNT;
 
 	height_map.set_area_dirty(origin, _shape.size());
 
@@ -103,10 +121,10 @@ void HeightMapBrush::paint(HeightMap &height_map, Point2i cell_pos, int override
 			flatten_height(data, origin);
 			break;
 
-		case MODE_TEXTURE:
-			// TODO Undo for this when we are sure it works
-			paint_indexed_texture(data, origin);
-			break;
+//		case MODE_TEXTURE:
+//			// TODO Undo for this when we are sure it works
+//			paint_indexed_texture(data, origin);
+//			break;
 
 		case MODE_COLOR:
 			paint_color(data, origin);
@@ -116,7 +134,7 @@ void HeightMapBrush::paint(HeightMap &height_map, Point2i cell_pos, int override
 			break;
 	}
 
-	data.notify_region_change(origin, _shape.size());
+	data.notify_region_change(origin, _shape.size(), get_mode_channel(mode));
 }
 
 template <typename Operator_T>
@@ -135,7 +153,7 @@ void foreach_xy(
 	Point2i min = origin;
 	Point2i max = min + shape_size;
 
-	data.heights.clamp_min_max_excluded(min, max);
+	clamp_min_max_excluded(min, max, Point2i(0,0), Point2i(data.get_resolution(), data.get_resolution()));
 
 	Point2i pos;
 	for (pos.y = min.y; pos.y < max.y; ++pos.y) {
@@ -148,38 +166,56 @@ void foreach_xy(
 }
 
 struct OperatorAdd {
+	Image &_im;
 	void operator()(HeightMapData &data, Point2i pos, float v) {
-		data.heights.set(pos, data.heights.get(pos) + v);
+		Color c = _im.get_pixel(pos.x, pos.y);
+		c.r += v;
+		_im.put_pixel(pos.x, pos.y, c);
 	}
 };
 
 struct OperatorSum {
 	float sum;
-	OperatorSum()
-		: sum(0) {}
+	const Image &_im;
+	OperatorSum(const Image &im)
+		: sum(0), _im(im) {}
 	void operator()(HeightMapData &data, Point2i pos, float v) {
-		sum += data.heights.get(pos) * v;
+		sum += _im.get_pixel(pos.x, pos.y).r * v;
 	}
 };
 
 struct OperatorLerp {
+
 	float target;
-	OperatorLerp(float p_target)
-		: target(p_target) {}
+	Image &_im;
+
+	OperatorLerp(float p_target, Image &im)
+		: target(p_target), _im(im) {}
+
 	void operator()(HeightMapData &data, Point2i pos, float v) {
-		data.heights.set(pos, Math::lerp(data.heights.get(pos), target, v));
+		Color c = _im.get_pixel(pos.x, pos.y);
+		c.r = Math::lerp(c.r, target, v);
+		_im.put_pixel(pos.x, pos.y, c);
 	}
 };
 
 struct OperatorLerpColor {
+
 	Color target;
-	OperatorLerpColor(Color p_target)
-		: target(p_target) {}
+	Image &_im;
+
+	OperatorLerpColor(Color p_target, Image &im)
+		: target(p_target), _im(im) {}
+
 	void operator()(HeightMapData &data, Point2i pos, float v) {
-		data.colors.set(pos, data.colors.get(pos).linear_interpolate(target, v));
+		Color c = _im.get_pixel(pos.x, pos.y);
+		c = c.linear_interpolate(target, v);
+		_im.put_pixel(pos.x, pos.y, c);
 	}
 };
 
+// TODO Experiment indexed texturing
+#if 0
 struct OperatorIndexedTexture {
 
 	int texture_index;
@@ -252,6 +288,7 @@ struct OperatorIndexedTexture {
 			print_line(String("Sum is above 1: {0}").format(varray(weight_sum)));
 	}
 };
+#endif
 
 /*static void debug_print_cache(const HeightMapBrush::UndoCache &cache, Point2i anchor) {
 	print_line(" ");
@@ -272,8 +309,11 @@ struct OperatorIndexedTexture {
 	}
 }*/
 
-template <typename T>
-void backup_for_undo(const Grid2D<T> &grid, HeightMapBrush::UndoCache &undo_cache, Point2i rect_origin, Point2i rect_size) {
+static bool is_valid_pos(Point2i pos, const Image &im) {
+	return !(pos.x < 0 || pos.y < 0 || pos.x >= im.get_width() || pos.y >= im.get_height());
+}
+
+void backup_for_undo(const Image &im, HeightMapBrush::UndoCache &undo_cache, Point2i rect_origin, Point2i rect_size) {
 
 	// Backup cells before they get changed,
 	// using chunks so that we don't save the entire grid everytime.
@@ -294,8 +334,8 @@ void backup_for_undo(const Grid2D<T> &grid, HeightMapBrush::UndoCache &undo_cach
 			Point2i min = cpos * HeightMap::CHUNK_SIZE;
 			Point2i max = min + Point2i(HeightMap::CHUNK_SIZE, HeightMap::CHUNK_SIZE);
 
-			bool invalid_min = !grid.is_valid_pos(min);
-			bool invalid_max = !grid.is_valid_pos(max - Point2i(1,1)); // Note: max is excluded
+			bool invalid_min = !is_valid_pos(min, im);
+			bool invalid_max = !is_valid_pos(max - Point2i(1,1), im); // Note: max is excluded
 
 			if(invalid_min || invalid_max) {
 				// Out of bounds
@@ -304,19 +344,22 @@ void backup_for_undo(const Grid2D<T> &grid, HeightMapBrush::UndoCache &undo_cach
 				continue;
 			}
 
-			PoolByteArray data = grid.dump_region(min, max);
-			undo_cache.chunks[cpos] = data;
-
-			//debug_print_cache(undo_cache, cpos);
+			Ref<Image> sub_image = im.get_rect(Rect2(min, max - min));
+			undo_cache.chunks[cpos] = sub_image;
 		}
 	}
 }
 
 void HeightMapBrush::paint_height(HeightMapData &data, Point2i origin, float speed) {
 
-	backup_for_undo(data.heights, _undo_cache, origin, _shape.size());
+	Ref<Image> im_ref = data.get_image(HeightMapData::CHANNEL_HEIGHT);
+	ERR_FAIL_COND(im_ref.is_null());
 
-	OperatorAdd op;
+	LockImage lock(im_ref);
+
+	backup_for_undo(**im_ref, _undo_cache, origin, _shape.size());
+
+	OperatorAdd op { **im_ref };
 	foreach_xy(op, data, origin, speed, _opacity, _shape);
 
 	data.update_normals(origin, _shape.size());
@@ -324,12 +367,18 @@ void HeightMapBrush::paint_height(HeightMapData &data, Point2i origin, float spe
 
 void HeightMapBrush::smooth_height(HeightMapData &data, Point2i origin, float speed) {
 
-	backup_for_undo(data.heights, _undo_cache, origin, _shape.size());
+	Ref<Image> im_ref = data.get_image(HeightMapData::CHANNEL_HEIGHT);
+	ERR_FAIL_COND(im_ref.is_null());
 
-	OperatorSum sum_op;
+	LockImage lock(im_ref);
+
+	backup_for_undo(**im_ref, _undo_cache, origin, _shape.size());
+
+	OperatorSum sum_op(**im_ref);
 	foreach_xy(sum_op, data, origin, 1, _opacity, _shape);
 	float target_value = sum_op.sum / _shape_sum;
-	OperatorLerp lerp_op(target_value);
+
+	OperatorLerp lerp_op(target_value, **im_ref);
 	foreach_xy(lerp_op, data, origin, speed, _opacity, _shape);
 
 	data.update_normals(origin, _shape.size());
@@ -337,14 +386,20 @@ void HeightMapBrush::smooth_height(HeightMapData &data, Point2i origin, float sp
 
 void HeightMapBrush::flatten_height(HeightMapData &data, Point2i origin) {
 
-	backup_for_undo(data.heights, _undo_cache, origin, _shape.size());
+	Ref<Image> im_ref = data.get_image(HeightMapData::CHANNEL_HEIGHT);
+	ERR_FAIL_COND(im_ref.is_null());
 
-	OperatorLerp op(_flatten_height);
+	LockImage lock(im_ref);
+
+	backup_for_undo(**im_ref, _undo_cache, origin, _shape.size());
+
+	OperatorLerp op(_flatten_height, **im_ref);
 	foreach_xy(op, data, origin, 1, 1, _shape);
 
 	data.update_normals(origin, _shape.size());
 }
 
+#if 0
 void HeightMapBrush::paint_indexed_texture(HeightMapData &data, Point2i origin) {
 
 	OperatorIndexedTexture op(_texture_index);
@@ -376,24 +431,29 @@ void HeightMapBrush::paint_indexed_texture(HeightMapData &data, Point2i origin) 
 	// but to handle transitions correctly there should be at least 4 slots.
 	// Then this information will be translated into vertices at meshing time.
 }
+#endif
 
 void HeightMapBrush::paint_color(HeightMapData &data, Point2i origin) {
 
-	backup_for_undo(data.colors, _undo_cache, origin, _shape.size());
+	Ref<Image> im_ref = data.get_image(HeightMapData::CHANNEL_COLOR);
+	ERR_FAIL_COND(im_ref.is_null());
 
-	OperatorLerpColor op(_color);
+	LockImage lock(im_ref);
+
+	backup_for_undo(**im_ref, _undo_cache, origin, _shape.size());
+
+	OperatorLerpColor op(_color, **im_ref);
 	foreach_xy(op, data, origin, 1, _opacity, _shape);
 }
 
-template <typename T>
-Array fetch_redo_chunks(const Grid2D<T> &grid, const List<Point2i> &keys) {
+static Array fetch_redo_chunks(const Image &im, const List<Point2i> &keys) {
 	Array output;
 	for (const List<Point2i>::Element *E = keys.front(); E; E = E->next()) {
 		Point2i cpos = E->get();
 		Point2i min = cpos * HeightMap::CHUNK_SIZE;
 		Point2i max = min + Point2i(1,1)*HeightMap::CHUNK_SIZE;
-		PoolByteArray data = grid.dump_region(min, max);
-		output.append(data);
+		Ref<Image> sub_image = im.get_rect(Rect2(min, max - min));
+		output.append(sub_image);
 	}
 	return output;
 }
@@ -403,37 +463,20 @@ HeightMapBrush::UndoData HeightMapBrush::pop_undo_redo_data(const HeightMapData 
 	// TODO If possible, use a custom Reference class to store this data into the UndoRedo API,
 	// but WITHOUT exposing it to scripts (so we won't need the following conversions!)
 
+	UndoData data;
+
 	List<Point2i> chunk_positions_list;
 	_undo_cache.chunks.get_key_list(&chunk_positions_list);
 
-	HeightMapData::Channel channel = HeightMapData::CHANNEL_HEIGHT;
+	HeightMapData::Channel channel = get_mode_channel(_mode);
+	ERR_FAIL_COND_V(channel == HeightMapData::CHANNEL_COUNT, data);
 
-	// Copy heightmap data after operation for redo
-	Array redo_data;
-	switch(_mode) {
-		case MODE_ADD:
-		case MODE_SUBTRACT:
-		case MODE_SMOOTH:
-		case MODE_FLATTEN:
-			redo_data = fetch_redo_chunks(heightmap_data.heights, chunk_positions_list);
-			channel = HeightMapData::CHANNEL_HEIGHT;
-			break;
-		case MODE_TEXTURE:
-			// TODO
-			print_line("No undo for this mode! (yet)");
-			break;
-		case MODE_COLOR:
-			redo_data = fetch_redo_chunks(heightmap_data.colors, chunk_positions_list);
-			channel = HeightMapData::CHANNEL_COLOR;
-			break;
-		default:
-			print_line("No undo for this mode!");
-			break;
-	}
-
-	Array undo_data;
+	Ref<Image> im_ref = heightmap_data.get_image(channel);
+	ERR_FAIL_COND_V(im_ref.is_null(), data);
+	Array redo_data = fetch_redo_chunks(**im_ref, chunk_positions_list);
 
 	// Convert chunk positions to flat int array
+	Array undo_data;
 	PoolIntArray chunk_positions;
 	chunk_positions.resize(chunk_positions_list.size() * 2);
 	{
@@ -451,7 +494,6 @@ HeightMapBrush::UndoData HeightMapBrush::pop_undo_redo_data(const HeightMapData 
 		}
 	}
 
-	UndoData data;
 	data.undo = undo_data;
 	data.redo = redo_data;
 	data.chunk_positions = chunk_positions;

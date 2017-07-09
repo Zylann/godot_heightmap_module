@@ -1,5 +1,14 @@
-#include "height_map.h"
 #include <scene/3d/camera.h>
+
+#include "height_map.h"
+#include "utility.h"
+#include "resources.gen.cpp"
+
+const char *HeightMap::SHADER_PARAM_HEIGHT_TEXTURE = "height_texture";
+const char *HeightMap::SHADER_PARAM_NORMAL_TEXTURE = "normal_texture";
+const char *HeightMap::SHADER_PARAM_COLOR_TEXTURE = "color_texture";
+const char *HeightMap::SHADER_PARAM_RESOLUTION = "heightmap_resolution";
+const char *HeightMap::SHADER_PARAM_INVERSE_TRANSFORM = "heightmap_inverse_transform";
 
 namespace {
 
@@ -42,6 +51,8 @@ namespace {
 			memdelete(&chunk);
 		}
 	};
+
+	Ref<Shader> s_default_shader;
 }
 
 HeightMap::HeightMap() {
@@ -49,16 +60,29 @@ HeightMap::HeightMap() {
 	set_notify_transform(true);
 	_collision_enabled = true;
 	_lodder.set_callbacks(s_make_chunk_cb, s_recycle_chunk_cb, this);
-	_remeshed_chunks = 0;
-	//print_line("HeightMap()");
+	_updated_chunks = 0;
 }
 
 HeightMap::~HeightMap() {
 	clear_chunk_cache();
-	//print_line("~HeightMap()");
+}
+
+void HeightMap::init_default_resources() {
+	ERR_FAIL_COND(s_default_shader.is_valid());
+	s_default_shader.instance();
+	s_default_shader->set_code(s_default_shader_code);
+}
+
+void HeightMap::free_default_resources() {
+	ERR_FAIL_COND(s_default_shader.is_null());
+	s_default_shader.unref();
 }
 
 void HeightMap::clear_chunk_cache() {
+
+	// The lodder has to be cleared because otherwise it will reference dangling pointers
+	_lodder.clear();
+
 	for_all_chunks(DeleteChunkAction());
 	_chunk_cache.clear();
 }
@@ -84,42 +108,97 @@ void HeightMap::set_data(Ref<HeightMapData> data) {
 
 	_data = data;
 
+	// Note: the order of these two is important
 	clear_chunk_cache();
 
 	if(_data.is_valid()) {
 
 #ifdef TOOLS_ENABLED
 		// This is a small UX improvement so that the user sees a default terrain
-		if(data->get_resolution() == 0) {
-			data->load_default();
+		if(is_inside_tree() && get_tree()->is_editor_hint()) {
+			if(data->get_resolution() == 0) {
+				data->load_default();
+			}
 		}
 #endif
 		_data->connect(HeightMapData::SIGNAL_RESOLUTION_CHANGED, this, "_on_data_resolution_changed");
 		_data->connect(HeightMapData::SIGNAL_REGION_CHANGED, this, "_on_data_region_changed");
 		_on_data_resolution_changed();
 
-	} else {
-		_lodder.clear();
+		update_material();
 	}
 }
 
 void HeightMap::_on_data_resolution_changed() {
+
 	clear_chunk_cache();
-	_pending_chunk_updates.clear();
+
 	_lodder.create_from_sizes(CHUNK_SIZE, _data->get_resolution());
-	_chunk_cache.resize(_lodder.get_lod_count() + 1);
+
+	_pending_chunk_updates.clear();
+	_chunk_cache.resize(_lodder.get_lod_count());
+	_mesher.configure(Point2i(CHUNK_SIZE, CHUNK_SIZE), _lodder.get_lod_count());
+	update_material();
 }
 
-void HeightMap::_on_data_region_changed(int min_x, int min_y, int max_x, int max_y) {	
+
+void HeightMap::_on_data_region_changed(int min_x, int min_y, int max_x, int max_y, int channel) {
 	//print_line(String("_on_data_region_changed {0}, {1}, {2}, {3}").format(varray(min_x, min_y, max_x, max_y)));
 	set_area_dirty(Point2i(min_x, min_y), Point2i(max_x - min_x, max_y - min_y));
 }
 
-void HeightMap::set_material(Ref<Material> p_material) {
-	if (_material != p_material) {
-		_material = p_material;
-		for_all_chunks(SetMaterialAction { p_material });
+void HeightMap::set_custom_shader(Ref<Shader> p_shader) {
+
+	if (_custom_shader != p_shader) {
+		_custom_shader = p_shader;
+
+#ifdef TOOLS_ENABLED
+		// When the new shader is empty, allows to fork from the default shader
+		if(is_inside_tree() && get_tree()->is_editor_hint()) {
+			if(p_shader.is_valid()) {
+				if(p_shader->get_code().empty()) {
+					p_shader->set_code(s_default_shader_code);
+				}
+			}
+		}
+#endif
+
+		update_material();
 	}
+}
+
+void HeightMap::update_material() {
+
+	if(_material.is_null()) {
+		_material.instance();
+	}
+	Ref<Shader> sh = s_default_shader;
+	_material->set_shader(_custom_shader.is_null() ? sh : _custom_shader);
+
+	Ref<Texture> height_texture;
+	Ref<Texture> normal_texture;
+	Ref<Texture> color_texture;
+	Vector2 res(-1,-1);
+
+	if(_data.is_valid()) {
+		height_texture = _data->get_texture(HeightMapData::CHANNEL_HEIGHT);
+		normal_texture = _data->get_texture(HeightMapData::CHANNEL_NORMAL);
+		color_texture = _data->get_texture(HeightMapData::CHANNEL_COLOR);
+		res.x = _data->get_resolution();
+		res.y = res.x;
+	}
+
+	if(is_inside_tree()) {
+		Transform gt = get_global_transform();
+		Transform t = gt.affine_inverse();
+		_material->set_shader_param(SHADER_PARAM_INVERSE_TRANSFORM, t);
+	}
+
+	// TODO Define param names in constants
+	_material->set_shader_param(SHADER_PARAM_HEIGHT_TEXTURE, height_texture);
+	_material->set_shader_param(SHADER_PARAM_NORMAL_TEXTURE, normal_texture);
+	_material->set_shader_param(SHADER_PARAM_COLOR_TEXTURE, color_texture);
+	_material->set_shader_param(SHADER_PARAM_RESOLUTION, res);
 }
 
 void HeightMap::set_collision_enabled(bool enabled) {
@@ -154,6 +233,7 @@ void HeightMap::_notification(int p_what) {
 		case NOTIFICATION_TRANSFORM_CHANGED: {
 			Transform world_transform = get_global_transform();
 			for_all_chunks(TransformChangedAction { &world_transform });
+			update_material();
 		} break;
 
 		case NOTIFICATION_VISIBILITY_CHANGED: {
@@ -182,7 +262,7 @@ void HeightMap::_process() {
 	if(_data.is_valid())
 		_lodder.update(viewer_pos);
 
-	_remeshed_chunks = 0;
+	_updated_chunks = 0;
 
 	// Update chunks
 	for(int i = 0; i < _pending_chunk_updates.size(); ++i) {
@@ -196,9 +276,9 @@ void HeightMap::_process() {
 	_pending_chunk_updates.clear();
 
 	// DEBUG
-	if(_remeshed_chunks > 0) {
-		print_line(String("Remeshed {0} chunks").format(varray(_remeshed_chunks)));
-	}
+//	if(_updated_chunks > 0) {
+//		print_line(String("Remeshed {0} chunks").format(varray(_updated_chunks)));
+//	}
 }
 
 void HeightMap::update_chunk(HeightMapChunk &chunk, int lod) {
@@ -206,17 +286,12 @@ void HeightMap::update_chunk(HeightMapChunk &chunk, int lod) {
 
 	if(chunk.is_dirty()) {
 
-		HeightMapMesher::Params mesher_params;
-		mesher_params.lod = lod;
-		mesher_params.origin = chunk.cell_origin;
-		mesher_params.size = Point2i(CHUNK_SIZE, CHUNK_SIZE);
-		mesher_params.smooth = true; // TODO Implement this option
-
-		Ref<Mesh> mesh = _mesher.make_chunk(mesher_params, **_data);
+		// TODO Calculate seams
+		Ref<Mesh> mesh = _mesher.get_chunk(lod, 0);
 		chunk.set_mesh(mesh);
 		chunk.set_dirty(false);
 
-		++_remeshed_chunks;
+		++_updated_chunks;
 	}
 
 	// TODO Update seams
@@ -321,15 +396,29 @@ Point2i HeightMap::local_pos_to_cell(Vector3 local_pos) const {
 			static_cast<int>(local_pos.z));
 }
 
+static float get_height_or_default(const Image &im, Point2i pos) {
+	if(pos.x < 0 || pos.y < 0|| pos.x >= im.get_width() || pos.y >= im.get_height())
+		return 0;
+	return im.get_pixel(pos.x, pos.y).r;
+}
+
 bool HeightMap::cell_raycast(Vector3 origin_world, Vector3 dir_world, Point2i &out_cell_pos) {
+
 	if(_data.is_null())
 		return false;
+
+	Ref<Image> heights_ref = _data->get_image(HeightMapData::CHANNEL_HEIGHT);
+	if(heights_ref.is_null())
+		return false;
+	Image &heights = **heights_ref;
 
 	Transform to_local = get_global_transform().affine_inverse();
 	Vector3 origin = to_local.xform(origin_world);
 	Vector3 dir = to_local.xform(dir_world);
 
-	if (origin.y < _data->heights.get_or_default(local_pos_to_cell(origin))) {
+	LockImage lock(heights_ref);
+
+	if (origin.y < get_height_or_default(heights, local_pos_to_cell(origin))) {
 		// Below
 		return false;
 	}
@@ -343,7 +432,7 @@ bool HeightMap::cell_raycast(Vector3 origin_world, Vector3 dir_world, Point2i &o
 	// TODO Could be optimized with a form of binary search
 	while (d < max_distance) {
 		pos += dir * unit;
-		if (_data->heights.get_or_default(local_pos_to_cell(pos)) > pos.y) {
+		if (get_height_or_default(heights, local_pos_to_cell(pos)) > pos.y) {
 			out_cell_pos = local_pos_to_cell(pos - dir * unit);
 			return true;
 		}
@@ -358,8 +447,8 @@ void HeightMap::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_data:HeightMapData"), &HeightMap::get_data);
 	ClassDB::bind_method(D_METHOD("set_data", "data:HeightMapData"), &HeightMap::set_data);
 
-	ClassDB::bind_method(D_METHOD("get_material:Material"), &HeightMap::get_material);
-	ClassDB::bind_method(D_METHOD("set_material", "material:Material"), &HeightMap::set_material);
+	ClassDB::bind_method(D_METHOD("get_custom_shader:Shader"), &HeightMap::get_custom_shader);
+	ClassDB::bind_method(D_METHOD("set_custom_shader", "shader:Shader"), &HeightMap::set_custom_shader);
 
 	ClassDB::bind_method(D_METHOD("is_collision_enabled"), &HeightMap::is_collision_enabled);
 	ClassDB::bind_method(D_METHOD("set_collision_enabled", "enabled"), &HeightMap::set_collision_enabled);
@@ -368,10 +457,10 @@ void HeightMap::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_lod_scale"), &HeightMap::get_lod_scale);
 
 	ClassDB::bind_method(D_METHOD("_on_data_resolution_changed"), &HeightMap::_on_data_resolution_changed);
-	ClassDB::bind_method(D_METHOD("_on_data_region_changed"), &HeightMap::_on_data_region_changed);
+	ClassDB::bind_method(D_METHOD("_on_data_region_changed", "x", "y", "w", "h", "c"), &HeightMap::_on_data_region_changed);
 
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "data", PROPERTY_HINT_RESOURCE_TYPE, "HeightMapData"), "set_data", "get_data");
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "material", PROPERTY_HINT_RESOURCE_TYPE, "Material"), "set_material", "get_material");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "custom_shader", PROPERTY_HINT_RESOURCE_TYPE, "Shader"), "set_custom_shader", "get_custom_shader");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "collision_enabled"), "set_collision_enabled", "is_collision_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "lod_scale"), "set_lod_scale", "get_lod_scale");
 }
