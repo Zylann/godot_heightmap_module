@@ -43,17 +43,17 @@ public:
 		_data[index(x, y)] = v;
 	}
 
-	inline T get_or_default(int x, int y) {
+	inline T get_or_default(int x, int y) const {
 		if (is_valid_pos(x, y))
 			return get(x, y);
 		return T();
 	}
 
-	inline T get_or_default(Point2i pos) {
+	inline T get_or_default(Point2i pos) const {
 		return get_or_default(pos.x, pos.y);
 	}
 
-	inline T get_clamped(int x, int y) {
+	inline T get_clamped(int x, int y) const {
 		if (x < 0)
 			x = 0;
 		if (y < 0)

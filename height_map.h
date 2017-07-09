@@ -63,7 +63,7 @@ private:
 	void _on_data_resolution_changed();
 	void _on_data_region_changed(int min_x, int min_y, int max_x, int max_y, int channel);
 
-	void clear_chunk_cache();
+	void clear_all_chunks();
 
 	HeightMapChunk *get_chunk_at(Point2i pos, int lod) const;
 
@@ -74,11 +74,12 @@ private:
 
 	template <typename Action_T>
 	void for_all_chunks(Action_T action) {
-		for(int lod = 0; lod < _chunk_cache.size(); ++lod) {
-			const Point2i *key = NULL;
-			while(key = _chunk_cache[lod].next(key)) {
-				HeightMapChunk *chunk = _chunk_cache[lod][*key];
-				action(*chunk);
+		for(int lod = 0; lod < _chunks.size(); ++lod) {
+			int area = _chunks[lod].area();
+			for(int i = 0; i < area; ++i) {
+				HeightMapChunk *chunk = _chunks[lod][i];
+				if(chunk)
+					action(*chunk);
 			}
 		}
 	}
@@ -101,8 +102,7 @@ private:
 
 	// [lod][pos]
 	// This container owns chunks, so will be used to free them
-	// TODO Change HashMaps to Grid2D
-	Vector< HashMap< Point2i, HeightMapChunk* > > _chunk_cache;
+	Vector< Grid2D< HeightMapChunk* > > _chunks;
 
 	// Stats
 	int _updated_chunks;

@@ -64,7 +64,7 @@ HeightMap::HeightMap() {
 }
 
 HeightMap::~HeightMap() {
-	clear_chunk_cache();
+	clear_all_chunks();
 }
 
 void HeightMap::init_default_resources() {
@@ -78,21 +78,18 @@ void HeightMap::free_default_resources() {
 	s_default_shader.unref();
 }
 
-void HeightMap::clear_chunk_cache() {
+void HeightMap::clear_all_chunks() {
 
 	// The lodder has to be cleared because otherwise it will reference dangling pointers
 	_lodder.clear();
 
 	for_all_chunks(DeleteChunkAction());
-	_chunk_cache.clear();
+	_chunks.clear();
 }
 
 HeightMapChunk *HeightMap::get_chunk_at(Point2i pos, int lod) const {
-	if(lod < _chunk_cache.size()) {
-		HeightMapChunk *const *pptr = _chunk_cache[lod].getptr(pos);
-		if(pptr)
-			return *pptr;
-	}
+	if(lod < _chunks.size())
+		return _chunks[lod].get_or_default(pos);
 	return NULL;
 }
 
@@ -109,7 +106,7 @@ void HeightMap::set_data(Ref<HeightMapData> data) {
 	_data = data;
 
 	// Note: the order of these two is important
-	clear_chunk_cache();
+	clear_all_chunks();
 
 	if(_data.is_valid()) {
 
@@ -131,12 +128,22 @@ void HeightMap::set_data(Ref<HeightMapData> data) {
 
 void HeightMap::_on_data_resolution_changed() {
 
-	clear_chunk_cache();
+	clear_all_chunks();
 
 	_lodder.create_from_sizes(CHUNK_SIZE, _data->get_resolution());
 
 	_pending_chunk_updates.clear();
-	_chunk_cache.resize(_lodder.get_lod_count());
+
+	_chunks.resize(_lodder.get_lod_count());
+
+	int cres = _data->get_resolution() / CHUNK_SIZE;
+	Point2i csize(cres, cres);
+	for(int lod = 0; lod < _chunks.size(); ++lod) {
+		_chunks[lod].resize(csize, false);
+		_chunks[lod].fill(NULL);
+		csize /= 2;
+	}
+
 	_mesher.configure(Point2i(CHUNK_SIZE, CHUNK_SIZE), _lodder.get_lod_count());
 	update_material();
 }
@@ -407,10 +414,10 @@ void HeightMap::set_area_dirty(Point2i origin_in_cells, Point2i size_in_cells) {
 	Point2i csize = (origin_in_cells + size_in_cells - Point2i(1,1)) / CHUNK_SIZE + Point2i(1,1);
 
 	// For each lod
-	for (int lod = 0; lod < _chunk_cache.size(); ++lod) {
+	for (int lod = 0; lod < _chunks.size(); ++lod) {
 
 		// Get grid and chunk size
-		const HashMap<Point2i, HeightMapChunk*> &grid = _chunk_cache[lod];
+		const Grid2D<HeightMapChunk*> &grid = _chunks[lod];
 		int s = _lodder.get_lod_size(lod);
 
 		// Convert rect into this lod's coordinates:
@@ -423,14 +430,10 @@ void HeightMap::set_area_dirty(Point2i origin_in_cells, Point2i size_in_cells) {
 		for (cpos.y = min.y; cpos.y < max.y; ++cpos.y) {
 			for (cpos.x = min.x; cpos.x < max.x; ++cpos.x) {
 
-				HeightMapChunk *const *chunk_ptr = grid.getptr(cpos);
+				HeightMapChunk *chunk = grid.get(cpos);
 
-				if (chunk_ptr) {
-					HeightMapChunk *chunk = *chunk_ptr;
-
-					if(chunk->is_active()) {
-						add_chunk_update(*chunk, cpos, lod);
-					}
+				if (chunk && chunk->is_active()) {
+					add_chunk_update(*chunk, cpos, lod);
 				}
 			}
 		}
@@ -448,7 +451,7 @@ HeightMapChunk *HeightMap::_make_chunk_cb(Point2i cpos, int lod) {
 		int lod_factor = _lodder.get_lod_size(lod);
 		Point2i origin_in_cells = cpos * CHUNK_SIZE * lod_factor;
 		chunk = memnew(HeightMapChunk(this, origin_in_cells, _material));
-		_chunk_cache[lod][cpos] = chunk;
+		_chunks[lod].set(cpos, chunk);
 
 	}
 
