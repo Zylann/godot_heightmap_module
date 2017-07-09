@@ -430,7 +430,7 @@ void HeightMap::set_area_dirty(Point2i origin_in_cells, Point2i size_in_cells) {
 		for (cpos.y = min.y; cpos.y < max.y; ++cpos.y) {
 			for (cpos.x = min.x; cpos.x < max.x; ++cpos.x) {
 
-				HeightMapChunk *chunk = grid.get(cpos);
+				HeightMapChunk *chunk = grid.get_or_default(cpos);
 
 				if (chunk && chunk->is_active()) {
 					add_chunk_update(*chunk, cpos, lod);
