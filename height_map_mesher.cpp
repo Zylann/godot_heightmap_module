@@ -4,7 +4,7 @@
 void HeightMapMesher::configure(Point2i chunk_size, int lod_count) {
 	ERR_FAIL_COND(chunk_size.x < 2 || chunk_size.y < 2);
 
-	if(chunk_size == _chunk_size)
+	if(chunk_size == _chunk_size && lod_count == _mesh_cache[0].size())
 		return;
 
 	_chunk_size = chunk_size;
