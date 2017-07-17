@@ -61,6 +61,7 @@ HeightMap::HeightMap() {
 	_collision_enabled = true;
 	_lodder.set_callbacks(s_make_chunk_cb, s_recycle_chunk_cb, this);
 	_updated_chunks = 0;
+	_progressive_lod = false;
 }
 
 HeightMap::~HeightMap() {
@@ -78,10 +79,22 @@ void HeightMap::free_default_resources() {
 	s_default_shader.unref();
 }
 
+void HeightMap::set_progressive_lod(bool enable) {
+	if(enable != _progressive_lod) {
+		_progressive_lod = enable;
+		if(enable == false) {
+			finish_tweens();
+		}
+	}
+}
+
 void HeightMap::clear_all_chunks() {
 
 	// The lodder has to be cleared because otherwise it will reference dangling pointers
 	_lodder.clear();
+
+	if(_progressive_lod)
+		finish_tweens();
 
 	for_all_chunks(DeleteChunkAction());
 	_chunks.clear();
@@ -352,6 +365,11 @@ void HeightMap::_process() {
 
 	_pending_chunk_updates.clear();
 
+	if(_progressive_lod) {
+		float delta = get_tree()->get_idle_process_time();
+		update_tweening_chunks(delta);
+	}
+
 	// DEBUG
 //	if(_updated_chunks > 0) {
 //		print_line(String("Remeshed {0} chunks").format(varray(_updated_chunks)));
@@ -460,12 +478,21 @@ HeightMapChunk *HeightMap::_make_chunk_cb(Point2i cpos, int lod) {
 
 	chunk->set_active(true);
 
+	if(_progressive_lod)
+		tween_chunk(chunk, false);
+
 	return chunk;
 }
 
 // Called when a chunk is no longer seen
 void HeightMap::_recycle_chunk_cb(HeightMapChunk *chunk) {
-	chunk->set_visible(false);
+
+	if(_progressive_lod) {
+		tween_chunk(chunk, true);
+	} else {
+		chunk->set_visible(false);
+	}
+
 	chunk->set_active(false);
 }
 
@@ -519,6 +546,94 @@ bool HeightMap::cell_raycast(Vector3 origin_world, Vector3 dir_world, Point2i &o
 	}
 
 	return false;
+}
+
+const float TWEEN_SPEED = 3.f;
+
+void HeightMap::tween_chunk(HeightMapChunk *chunk, bool sign) {
+
+	Map<HeightMapChunk*, ChunkTween>::Element *e = _tweening_chunks.find(chunk);
+
+	if(e) {
+		ChunkTween &tween = e->value();
+		tween.sign = sign;
+
+	} else {
+		ChunkTween tween;
+		tween.sign = sign;
+		tween.time = !sign;
+		if(sign)
+			tween.delay = 1.f / TWEEN_SPEED;
+		_tweening_chunks[chunk] = tween;
+	}
+}
+
+void HeightMap::update_tweening_chunks(float delta) {
+
+	const float ds = delta * TWEEN_SPEED;
+
+	Vector<HeightMapChunk*> finished_tweens;
+	Transform global_transform = get_global_transform();
+
+	for (Map<HeightMapChunk*, ChunkTween>::Element *e = _tweening_chunks.front(); e; e = e->next()) {
+
+		HeightMapChunk *chunk = e->key();
+		ChunkTween &tween = e->value();
+
+		bool finished = false;
+
+		if(tween.delay > 0) {
+			tween.delay -= delta;
+			continue;
+		}
+
+		if(tween.sign) {
+			tween.time += ds;
+			if(tween.time >= 1.f) {
+				tween.time = 1;
+				finished = true;
+			}
+		} else {
+			tween.time -= ds;
+			if(tween.time <= 0.f) {
+				tween.time = 0;
+				finished = true;
+			}
+		}
+
+		Vector3 up = global_transform.basis.get_axis(1);
+		Transform t = global_transform.translated(-2.f * up * tween.time);
+		chunk->parent_transform_changed(t);
+
+		if(finished) {
+			finished_tweens.push_back(chunk);
+
+			if(tween.sign) {
+				chunk->set_visible(false);
+			}
+
+			// Reset transform to what it should be without the tween
+			chunk->parent_transform_changed(global_transform);
+		}
+	}
+
+	for(int i = 0; i < finished_tweens.size(); ++i) {
+		_tweening_chunks.erase(finished_tweens[i]);
+	}
+}
+
+void HeightMap::finish_tweens() {
+
+	// Seek all tween times to end
+	for (Map<HeightMapChunk*, ChunkTween>::Element *e = _tweening_chunks.front(); e; e = e->next()) {
+		ChunkTween &tween = e->value();
+		tween.time = tween.sign;
+		tween.delay = 0;
+	}
+
+	// Then update to finish them
+	update_tweening_chunks(0.1f);
+	ERR_FAIL_COND(_tweening_chunks.size() != 0);
 }
 
 void HeightMap::_bind_methods() {

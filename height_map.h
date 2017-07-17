@@ -39,6 +39,9 @@ public:
 	void set_area_dirty(Point2i origin_in_cells, Point2i size_in_cells);
 	bool cell_raycast(Vector3 origin_world, Vector3 dir_world, Point2i &out_cell_pos);
 
+	bool get_progressive_lod() const { return _progressive_lod; }
+	void set_progressive_lod(bool enable);
+
 	static void init_default_resources();
 	static void free_default_resources();
 
@@ -66,6 +69,10 @@ private:
 	void clear_all_chunks();
 
 	HeightMapChunk *get_chunk_at(Point2i pos, int lod) const;
+
+	void tween_chunk(HeightMapChunk *chunk, bool sign);
+	void update_tweening_chunks(float delta);
+	void finish_tweens();
 
 	static void _bind_methods();
 
@@ -103,6 +110,17 @@ private:
 	// [lod][pos]
 	// This container owns chunks, so will be used to free them
 	Vector< Grid2D< HeightMapChunk* > > _chunks;
+
+	struct ChunkTween {
+		float delay;
+		float time;
+		bool sign;
+		ChunkTween() : delay(0), time(0), sign(false) {}
+	};
+
+	// EXPERIMENTAL
+	Map< HeightMapChunk*, ChunkTween > _tweening_chunks;
+	bool _progressive_lod;
 
 	// Stats
 	int _updated_chunks;
