@@ -46,7 +46,9 @@ public:
 	Ref<Texture> get_texture(Channel channel);
 	Ref<Image> get_image(Channel channel) const;
 
+	static Color encode_normal(Vector3 n);
 	static Vector3 decode_normal(Color c);
+
 	static Image::Format get_channel_format(Channel channel);
 
 	Error _load(FileAccess &f);

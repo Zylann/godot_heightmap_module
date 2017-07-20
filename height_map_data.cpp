@@ -130,7 +130,7 @@ void HeightMapData::update_normals(Point2i min, Point2i size) {
 
 			Vector3 n = Vector3(left - right, 2.0, back - fore).normalized();
 
-			normals.set_pixel(pos.x, pos.y, Color(n.x, n.y, n.z, 0));
+			normals.set_pixel(pos.x, pos.y, encode_normal(n));
 		}
 	}
 
@@ -279,11 +279,18 @@ Ref<Texture> HeightMapData::get_texture(Channel channel) {
 	return _textures[channel];
 }
 
+Color HeightMapData::encode_normal(Vector3 n) {
+	return Color(
+		0.5 * (n.x + 1.0),
+		0.5 * (n.y + 1.0),
+		0.5 * (n.z + 1.0), 1.0);
+}
+
 Vector3 HeightMapData::decode_normal(Color c) {
 	return Vector3(
-		2.f * c.r - 1.f,
-		2.f * c.g - 1.f,
-		2.f * c.b - 1.f);
+		2.0 * c.r - 1.0,
+		2.0 * c.g - 1.0,
+		2.0 * c.b - 1.0);
 }
 
 void HeightMapData::_bind_methods() {
