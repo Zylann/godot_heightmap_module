@@ -245,6 +245,13 @@ void HeightMapData::upload_region(Channel channel, Point2i min, Point2i max) {
 		_textures[channel].instance();
 	}
 
+	int flags = 0;
+
+	if(channel == CHANNEL_NORMAL) {
+		// To allow smooth shading in fragment shader
+		flags |= Texture::FLAG_FILTER;
+	}
+
 	//               ..ooo@@@XXX%%%xx..
 	//            .oo@@XXX%x%xxx..     ` .
 	//          .o@XX%%xx..               ` .
@@ -264,7 +271,7 @@ void HeightMapData::upload_region(Channel channel, Point2i min, Point2i max) {
 	//           V     .           .     V
 	//
 	// TODO Partial update pleaaase! SLOOOOOOOOOOWNESS AHEAD !!
-	_textures[channel]->create_from_image(_images[channel], 0);
+	_textures[channel]->create_from_image(_images[channel], flags);
 	//print_line(String("Channel updated ") + String::num(channel));
 }
 
