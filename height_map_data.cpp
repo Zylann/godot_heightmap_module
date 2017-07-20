@@ -406,8 +406,8 @@ Error HeightMapData::_load(FileAccess &f) {
 	size.y = size.x;
 	//print_line(String("Loaded resolution ") + String::num(_resolution));
 
-	ERR_FAIL_COND_V(size.x >= MAX_RESOLUTION, ERR_FILE_CORRUPT);
-	ERR_FAIL_COND_V(size.y >= MAX_RESOLUTION, ERR_FILE_CORRUPT);
+	ERR_FAIL_COND_V(size.x > MAX_RESOLUTION, ERR_FILE_CORRUPT);
+	ERR_FAIL_COND_V(size.y > MAX_RESOLUTION, ERR_FILE_CORRUPT);
 
 	for(int channel = 0; channel < CHANNEL_COUNT; ++channel) {
 		load_channel(_images[channel], channel, f, size);
