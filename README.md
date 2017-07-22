@@ -1,6 +1,8 @@
 Heightmap Terrain for Godot Engine 3.0
 ========================================
 
+![Editor screenshot](screenshot.png)
+
 C++ module for creating heightmaps.
 
 Install the contents of the repo in a folder under "modules/", named "hterrain".
