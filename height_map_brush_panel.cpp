@@ -1,12 +1,16 @@
 #include "height_map_brush_panel.h"
+#include "scene/gui/button.h"
+#include "scene/gui/file_dialog.h"
 
 const char *HeightMapBrushPanel::PARAM_CHANGED = "param_changed";
+const char *HeightMapBrushPanel::SIGNAL_FILE_IMPORTED = "file_imported";
 
 HeightMapBrushPanel::HeightMapBrushPanel() {
 
 	set_custom_minimum_size(Vector2(35, 112));
 
-	int y = 10;
+	int y0 = 10;
+	int y = y0;
 	const int spacing = 24;
 
 	{
@@ -62,6 +66,21 @@ HeightMapBrushPanel::HeightMapBrushPanel() {
 		_height_edit->connect("value_changed", this, "_on_param_changed", varray(BRUSH_HEIGHT));
 		add_child(_height_edit);
 	}
+
+	FileDialog *import_dialog = memnew(FileDialog);
+	import_dialog->connect("file_selected", this, "_import_file_selected");
+	import_dialog->set_mode(FileDialog::MODE_OPEN_FILE);
+	import_dialog->add_filter("*.raw ; RAW files");
+	import_dialog->set_size(Vector2(400,300));
+	import_dialog->set_resizable(true);
+	import_dialog->set_access(FileDialog::ACCESS_FILESYSTEM);
+	add_child(import_dialog);
+
+	Button *import_button = memnew(Button);
+	import_button->set_text(TTR("Import RAW..."));
+	import_button->set_position(Vector2(300, y0));
+	import_button->connect("pressed", import_dialog, "popup_centered_minsize", varray(Vector2(400,300)));
+	add_child(import_button);
 }
 
 HeightMapBrushPanel::~HeightMapBrushPanel() {
@@ -94,9 +113,15 @@ void HeightMapBrushPanel::on_param_changed(Variant value, int param) {
 	emit_signal(PARAM_CHANGED, value, param);
 }
 
+void HeightMapBrushPanel::_import_file_selected(String p_path) {
+	emit_signal(SIGNAL_FILE_IMPORTED, p_path);
+}
+
 void HeightMapBrushPanel::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("_on_param_changed", "value", "param"), &HeightMapBrushPanel::on_param_changed);
+	ClassDB::bind_method(D_METHOD("_import_file_selected", "path"), &HeightMapBrushPanel::_import_file_selected);
 
 	ADD_SIGNAL(MethodInfo(PARAM_CHANGED));
+	ADD_SIGNAL(MethodInfo(SIGNAL_FILE_IMPORTED, PropertyInfo(Variant::STRING, "path")));
 }

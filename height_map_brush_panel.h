@@ -12,6 +12,7 @@ public:
 	~HeightMapBrushPanel();
 
 	static const char *PARAM_CHANGED;
+	static const char *SIGNAL_FILE_IMPORTED;
 
 	enum Params {
 		BRUSH_SIZE = 0,
@@ -26,6 +27,7 @@ protected:
 
 private:
 	void on_param_changed(Variant value, int param);
+	void _import_file_selected(String p_path);
 
 private:
 	Label *_size_label;

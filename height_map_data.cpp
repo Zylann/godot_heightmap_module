@@ -61,7 +61,7 @@ void HeightMapData::set_resolution(int p_res) {
 		_images[CHANNEL_HEIGHT]->resize(_resolution, _resolution);
 	}
 
-	// Resize heights
+	// Resize normals
 	if(_images[CHANNEL_NORMAL].is_null()) {
 		_images[CHANNEL_NORMAL].instance();
 	}

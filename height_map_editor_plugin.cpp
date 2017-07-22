@@ -17,6 +17,7 @@ HeightMapEditorPlugin::HeightMapEditorPlugin(EditorNode *p_editor) {
 
 	_brush_panel = memnew(HeightMapBrushPanel);
 	_brush_panel->connect(HeightMapBrushPanel::PARAM_CHANGED, this, "_on_brush_param_changed");
+	_brush_panel->connect(HeightMapBrushPanel::SIGNAL_FILE_IMPORTED, this, "_import_raw_file_selected");
 	_brush_panel->init_params(
 			_brush.get_radius(),
 			_brush.get_opacity(),
@@ -66,6 +67,14 @@ HeightMapEditorPlugin::HeightMapEditorPlugin(EditorNode *p_editor) {
 		_toolbar->add_child(button);
 	}
 
+	_import_confirmation_dialog = memnew(ConfirmationDialog);
+	add_child(_import_confirmation_dialog);
+	_import_confirmation_dialog->get_ok()->set_text(TTR("Import anyways"));
+	_import_confirmation_dialog->connect("confirmed", this, "_import_raw_file");
+
+	_accept_dialog = memnew(AcceptDialog);
+	add_child(_accept_dialog);
+
 	get_resource_previewer()->add_preview_generator(Ref<EditorResourcePreviewGenerator>(memnew(HeightMapPreviewGenerator())));
 }
 
@@ -73,7 +82,8 @@ HeightMapEditorPlugin::~HeightMapEditorPlugin() {
 }
 
 bool HeightMapEditorPlugin::forward_spatial_gui_input(Camera *p_camera, const Ref<InputEvent> &p_event) {
-	ERR_FAIL_COND_V(_height_map == NULL, false);
+	if(_height_map == NULL)
+		return false;
 
 	_height_map->_manual_viewer_pos = p_camera->get_global_transform().origin;
 
@@ -227,11 +237,120 @@ void HeightMapEditorPlugin::_brush_param_changed(Variant value, int param) {
 	}
 }
 
+static Point2i get_size_from_raw_length(int len) {
+	size_t side_len = static_cast<int>(Math::round(Math::sqrt(static_cast<float>(len/2))));
+	Point2i size(side_len, side_len);
+	return size;
+}
+
+void HeightMapEditorPlugin::_import_raw_file_selected(String path) {
+
+	ERR_FAIL_COND(_height_map == NULL);
+	Ref<HeightMapData> data_ref = _height_map->get_data();
+	ERR_FAIL_COND(data_ref.is_null());
+
+	Error err = OK;
+	FileAccess *f = FileAccess::open(path, FileAccess::READ, &err);
+	if(!f) {
+		print_line("Error opening file");
+		return;
+	}
+
+	// Assume the raw data is square, so its size is function of file length
+	size_t len = f->get_len();
+	Point2i size = get_size_from_raw_length(len);
+	f->close();
+
+	print_line(String("Deducted RAW heightmap resolution: {0}*{1}, for a length of {2}")
+			   .format(varray(size.x, size.y, len)));
+
+	if(len/2 != size.x * size.y) {
+
+		_accept_dialog->set_title(TTR("Import RAW heightmap error"));
+		_accept_dialog->set_text(TTR("The square resolution deducted from file size is not square.\n"
+									 "Cannot import heightmap."));
+		_accept_dialog->popup_centered_minsize();
+	}
+
+	_import_file_path = path;
+
+	if(nearest_power_of_2(size.x)+1 != size.x) {
+
+		_import_confirmation_dialog->set_title(TTR("Import RAW heightmap"));
+		_import_confirmation_dialog->set_text(
+			TTR("The square resolution deducted from file size is not power of two + 1.\n"
+				"The heightmap will be cropped/. Continue?"));
+
+		_import_confirmation_dialog->popup_centered_minsize();
+
+	} else {
+
+		// Go!
+		_import_raw_file();
+	}
+}
+
+void HeightMapEditorPlugin::_import_raw_file() {
+
+	ERR_FAIL_COND(_height_map == NULL);
+	Ref<HeightMapData> data_ref = _height_map->get_data();
+	ERR_FAIL_COND(data_ref.is_null());
+	HeightMapData &data = **data_ref;
+
+	Error err = OK;
+	FileAccess *f = FileAccess::open(_import_file_path, FileAccess::READ, &err);
+	ERR_FAIL_COND(!f);
+
+	Point2i src_size = get_size_from_raw_length(f->get_len());
+
+	// Note: resolution will be brought back to power of two + 1, if not already
+	data.set_resolution(src_size.x);
+
+	Point2i dst_size(data.get_resolution(), data.get_resolution());
+
+	Ref<Image> height_image_ref = data.get_image(HeightMapData::CHANNEL_HEIGHT);
+	ERR_FAIL_COND(height_image_ref.is_null());
+	Image &height_image = **height_image_ref;
+
+	// TODO Have these configurable
+	float min_y = 0;
+	float max_y = 600;
+	float hrange = max_y - min_y;
+
+	height_image.lock();
+
+	Point2i size(MIN(src_size.x, dst_size.x), MIN(src_size.y, dst_size.y));
+
+	for(int y = 0; y < size.y; ++y) {
+		for(int x = 0; x < size.x; ++x) {
+			uint16_t d = f->get_16();
+			float h = min_y + hrange * static_cast<float>(d) / 65536.f;
+			height_image.set_pixel(x, y, Color(h, 0,0,0));
+		}
+		// Skip next pixels if the file is bigger than the accepted resolution
+		for(int x = size.x; x < src_size.x; ++x) {
+			f->get_16();
+		}
+	}
+
+	// TODO Fill gaps by clamped values if sizes don't exactly match a power of two
+
+	f->close();
+
+	height_image.unlock();
+
+	data.update_all_normals();
+
+	data.notify_region_change(Point2i(0, 0), size, HeightMapData::CHANNEL_HEIGHT);
+}
+
 void HeightMapEditorPlugin::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("_on_mode_selected", "mode"), &HeightMapEditorPlugin::_mode_selected);
 	ClassDB::bind_method(D_METHOD("_on_brush_param_changed", "value", "param"), &HeightMapEditorPlugin::_brush_param_changed);
 	ClassDB::bind_method(D_METHOD("_height_map_exited_scene"), &HeightMapEditorPlugin::_height_map_exited_scene);
+	ClassDB::bind_method(D_METHOD("_import_raw_file_selected", "path"), &HeightMapEditorPlugin::_import_raw_file_selected);
+	ClassDB::bind_method(D_METHOD("_import_raw_file"), &HeightMapEditorPlugin::_import_raw_file);
 }
 
 //------------------------------------------

@@ -27,6 +27,10 @@ private:
 	void _mode_selected(int mode);
 	void _brush_param_changed(Variant value, int param);
 	void _height_map_exited_scene();
+
+	void _import_raw_file_selected(String path);
+	void _import_raw_file();
+
 	void paint(Camera &camera, Vector2 screen_pos, int override_mode = -1);
 
 private:
@@ -35,6 +39,10 @@ private:
 	HeightMapBrushPanel *_brush_panel;
 	HBoxContainer *_toolbar;
 	HeightMapBrush _brush;
+
+	String _import_file_path;
+	ConfirmationDialog *_import_confirmation_dialog;
+	AcceptDialog *_accept_dialog;
 
 	bool _mouse_pressed;
 };
