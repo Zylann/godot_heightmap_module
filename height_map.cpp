@@ -12,17 +12,20 @@ const char *HeightMap::SHADER_PARAM_INVERSE_TRANSFORM = "heightmap_inverse_trans
 
 namespace {
 
-	struct SetMaterialAction {
-		Ref<Material> material;
-		void operator()(HeightMapChunk &chunk) {
-			chunk.set_material(material);
-		}
-	};
+//	struct SetMaterialAction {
+//		Ref<Material> material;
+//		void operator()(HeightMapChunk &chunk) {
+//			chunk.set_material(material);
+//		}
+//	};
 
 	struct EnterWorldAction {
-		Ref<World> world;
+		World *world;
+		EnterWorldAction(Ref<World> w) {
+			world = *w;
+		}
 		void operator()(HeightMapChunk &chunk) {
-			chunk.enter_world(**world);
+			chunk.enter_world(*world);
 		}
 	};
 
@@ -33,14 +36,20 @@ namespace {
 	};
 
 	struct TransformChangedAction {
-		Transform *transform;
+		Transform transform;
+		TransformChangedAction(Transform t) {
+			transform = t;
+		}
 		void operator()(HeightMapChunk &chunk) {
-			chunk.parent_transform_changed(*transform);
+			chunk.parent_transform_changed(transform);
 		}
 	};
 
 	struct VisibilityChangedAction {
 		bool visible;
+		VisibilityChangedAction(bool v) {
+			visible = v;
+		}
 		void operator()(HeightMapChunk &chunk) {
 			chunk.set_visible(visible);
 		}
@@ -227,25 +236,22 @@ void HeightMap::_notification(int p_what) {
 			set_process(true);
 			break;
 
-		case NOTIFICATION_ENTER_WORLD: {
-			Ref<World> world = get_world();
-			for_all_chunks(EnterWorldAction { world });
-		} break;
+		case NOTIFICATION_ENTER_WORLD:
+			for_all_chunks(EnterWorldAction(get_world()));
+			break;
 
 		case NOTIFICATION_EXIT_WORLD:
 			for_all_chunks(ExitWorldAction());
 			break;
 
-		case NOTIFICATION_TRANSFORM_CHANGED: {
-			Transform world_transform = get_global_transform();
-			for_all_chunks(TransformChangedAction { &world_transform });
+		case NOTIFICATION_TRANSFORM_CHANGED:
+			for_all_chunks(TransformChangedAction(get_global_transform()));
 			update_material();
-		} break;
+			break;
 
-		case NOTIFICATION_VISIBILITY_CHANGED: {
-			bool visible = is_visible();
-			for_all_chunks(VisibilityChangedAction { visible });
-		} break;
+		case NOTIFICATION_VISIBILITY_CHANGED:
+			for_all_chunks(VisibilityChangedAction(is_visible()));
+			break;
 
 		case NOTIFICATION_PROCESS:
 			_process();
