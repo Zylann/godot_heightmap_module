@@ -529,11 +529,11 @@ bool HeightMap::cell_raycast(Vector3 origin_world, Vector3 dir_world, Point2i &o
 
 void HeightMap::_bind_methods() {
 
-	ClassDB::bind_method(D_METHOD("get_data:HeightMapData"), &HeightMap::get_data);
-	ClassDB::bind_method(D_METHOD("set_data", "data:HeightMapData"), &HeightMap::set_data);
+	ClassDB::bind_method(D_METHOD("get_data"), &HeightMap::get_data);
+	ClassDB::bind_method(D_METHOD("set_data", "data"), &HeightMap::set_data);
 
-	ClassDB::bind_method(D_METHOD("get_custom_shader:Shader"), &HeightMap::get_custom_shader);
-	ClassDB::bind_method(D_METHOD("set_custom_shader", "shader:Shader"), &HeightMap::set_custom_shader);
+	ClassDB::bind_method(D_METHOD("get_custom_shader"), &HeightMap::get_custom_shader);
+	ClassDB::bind_method(D_METHOD("set_custom_shader", "shader"), &HeightMap::set_custom_shader);
 
 	ClassDB::bind_method(D_METHOD("is_collision_enabled"), &HeightMap::is_collision_enabled);
 	ClassDB::bind_method(D_METHOD("set_collision_enabled", "enabled"), &HeightMap::set_collision_enabled);
