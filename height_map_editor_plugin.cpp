@@ -262,7 +262,7 @@ void HeightMapEditorPlugin::_import_raw_file_selected(String path) {
 	f->close();
 
 	print_line(String("Deducted RAW heightmap resolution: {0}*{1}, for a length of {2}")
-			   .format(varray(size.x, size.y, len)));
+			   .format(varray(size.x, size.y, static_cast<int>(len))));
 
 	if(len/2 != size.x * size.y) {
 
