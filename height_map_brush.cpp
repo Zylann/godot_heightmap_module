@@ -167,6 +167,8 @@ void foreach_xy(
 
 struct OperatorAdd {
 	Image &_im;
+	OperatorAdd(Image &im)
+		: _im(im) {}
 	void operator()(HeightMapData &data, Point2i pos, float v) {
 		Color c = _im.get_pixel(pos.x, pos.y);
 		c.r += v;
@@ -359,7 +361,7 @@ void HeightMapBrush::paint_height(HeightMapData &data, Point2i origin, float spe
 
 	backup_for_undo(**im_ref, _undo_cache, origin, _shape.size());
 
-	OperatorAdd op { **im_ref };
+	OperatorAdd op(**im_ref);
 	foreach_xy(op, data, origin, speed, _opacity, _shape);
 
 	data.update_normals(origin, _shape.size());
