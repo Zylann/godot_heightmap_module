@@ -159,7 +159,7 @@ void foreach_xy(
 	for (pos.y = min.y; pos.y < max.y; ++pos.y) {
 		for (pos.x = min.x; pos.x < max.x; ++pos.x) {
 
-			float shape_value = shape.get(pos - origin);
+			float shape_value = shape.get(pos - min);
 			op(data, pos, s * shape_value);
 		}
 	}
@@ -341,8 +341,11 @@ void backup_for_undo(const Image &im, HeightMapBrush::UndoCache &undo_cache, Poi
 
 			if(invalid_min || invalid_max) {
 				// Out of bounds
-				if(invalid_min ^ invalid_max)
-					print_line("Wut? Grid might not be multiple of chunk size!");
+
+				// Note: this error check isn't working because data grids are intentionally off-by-one
+				//if(invalid_min ^ invalid_max)
+				//	print_line("Wut? Grid might not be multiple of chunk size!");
+
 				continue;
 			}
 
