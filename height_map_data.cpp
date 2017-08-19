@@ -48,8 +48,9 @@ void HeightMapData::set_resolution(int p_res) {
 
 	// Power of two is important for LOD.
 	// Also, grid data is off by one,
-	// because for an even number of quads you need an odd number of vertices
-	p_res = nearest_power_of_2(p_res - 1) + 1;
+	// because for an even number of quads you need an odd number of vertices.
+	// To prevent size from increasing at every deserialization, remove 1 before applying power of two.
+	p_res = next_power_of_2(p_res - 1) + 1;
 
 	_resolution = p_res;
 

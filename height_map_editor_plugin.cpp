@@ -274,7 +274,7 @@ void HeightMapEditorPlugin::_import_raw_file_selected(String path) {
 
 	_import_file_path = path;
 
-	if(nearest_power_of_2(size.x)+1 != size.x) {
+	if(next_power_of_2(size.x)+1 != size.x) {
 
 		_import_confirmation_dialog->set_title(TTR("Import RAW heightmap"));
 		_import_confirmation_dialog->set_text(
