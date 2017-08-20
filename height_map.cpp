@@ -1,4 +1,5 @@
 #include <scene/3d/camera.h>
+#include <engine.h>
 
 #include "height_map.h"
 #include "utility.h"
@@ -121,7 +122,7 @@ void HeightMap::set_data(Ref<HeightMapData> data) {
 
 #ifdef TOOLS_ENABLED
 		// This is a small UX improvement so that the user sees a default terrain
-		if(is_inside_tree() && get_tree()->is_editor_hint()) {
+		if(is_inside_tree() && Engine::get_singleton()->is_editor_hint()) {
 			if(data->get_resolution() == 0) {
 				data->load_default();
 			}
@@ -170,7 +171,7 @@ void HeightMap::set_custom_shader(Ref<Shader> p_shader) {
 
 #ifdef TOOLS_ENABLED
 		// When the new shader is empty, allows to fork from the default shader
-		if(is_inside_tree() && get_tree()->is_editor_hint()) {
+		if(is_inside_tree() && Engine::get_singleton()->is_editor_hint()) {
 			if(p_shader.is_valid()) {
 				if(p_shader->get_code().empty()) {
 					p_shader->set_code(s_default_shader_code);
