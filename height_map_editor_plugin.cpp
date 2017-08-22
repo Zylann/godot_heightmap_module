@@ -68,12 +68,12 @@ HeightMapEditorPlugin::HeightMapEditorPlugin(EditorNode *p_editor) {
 	}
 
 	_import_confirmation_dialog = memnew(ConfirmationDialog);
-	add_child(_import_confirmation_dialog);
+	get_base_control()->add_child(_import_confirmation_dialog);
 	_import_confirmation_dialog->get_ok()->set_text(TTR("Import anyways"));
 	_import_confirmation_dialog->connect("confirmed", this, "_import_raw_file");
 
 	_accept_dialog = memnew(AcceptDialog);
-	add_child(_accept_dialog);
+	get_base_control()->add_child(_accept_dialog);
 
 	get_resource_previewer()->add_preview_generator(Ref<EditorResourcePreviewGenerator>(memnew(HeightMapPreviewGenerator())));
 }
