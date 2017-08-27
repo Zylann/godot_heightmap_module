@@ -67,15 +67,19 @@ HeightMapEditorPlugin::HeightMapEditorPlugin(EditorNode *p_editor) {
 		_toolbar->add_child(button);
 	}
 
+	EditorInterface *editor_interface = get_editor_interface();
+	Control *base_control = editor_interface->get_base_control();
+
 	_import_confirmation_dialog = memnew(ConfirmationDialog);
-	get_base_control()->add_child(_import_confirmation_dialog);
+	base_control->add_child(_import_confirmation_dialog);
 	_import_confirmation_dialog->get_ok()->set_text(TTR("Import anyways"));
 	_import_confirmation_dialog->connect("confirmed", this, "_import_raw_file");
 
 	_accept_dialog = memnew(AcceptDialog);
-	get_base_control()->add_child(_accept_dialog);
+	base_control->add_child(_accept_dialog);
 
-	get_resource_previewer()->add_preview_generator(Ref<EditorResourcePreviewGenerator>(memnew(HeightMapPreviewGenerator())));
+	EditorResourcePreview *previewer = editor_interface->get_resource_previewer();
+	previewer->add_preview_generator(Ref<EditorResourcePreviewGenerator>(memnew(HeightMapPreviewGenerator())));
 }
 
 HeightMapEditorPlugin::~HeightMapEditorPlugin() {
@@ -184,7 +188,7 @@ void HeightMapEditorPlugin::paint(Camera &camera, Vector2 screen_pos, int overri
 void HeightMapEditorPlugin::edit(Object *p_object) {
 
 	//printf("Edit %i\n", p_object);
-	HeightMap *node = p_object ? p_object->cast_to<HeightMap>() : NULL;
+	HeightMap *node = p_object ? Object::cast_to<HeightMap>(p_object) : NULL;
 
 	if(_height_map) {
 		_height_map->disconnect(SceneStringNames::get_singleton()->tree_exited, this, "_height_map_exited_scene");

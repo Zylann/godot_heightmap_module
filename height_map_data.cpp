@@ -456,11 +456,15 @@ Error HeightMapDataSaver::save(const String &p_path, const Ref<Resource> &p_reso
 }
 
 bool HeightMapDataSaver::recognize(const Ref<Resource> &p_resource) const {
-	return p_resource->cast_to<HeightMapData>() != NULL;
+	if(p_resource.is_null())
+		return false;
+	return Object::cast_to<HeightMapData>(*p_resource) != NULL;
 }
 
 void HeightMapDataSaver::get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions) const {
-	if (p_resource->cast_to<HeightMapData>()) {
+	if(p_resource.is_null())
+		return;
+	if (Object::cast_to<HeightMapData>(*p_resource)) {
 		p_extensions->push_back(HEIGHTMAP_EXTENSION);
 	}
 }
