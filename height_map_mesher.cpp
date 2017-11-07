@@ -49,6 +49,7 @@ Ref<Mesh> HeightMapMesher::make_flat_chunk(Point2i chunk_size, int stride, int s
 
 	Ref<ArrayMesh> mesh_ref(memnew(ArrayMesh));
 	mesh_ref->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
+	mesh_ref->set_custom_aabb(Rect3(Vector3(0,0,0),Vector3(chunk_size.x,100.0,chunk_size.y)));// Clipping fix
 
 	return mesh_ref;
 }
