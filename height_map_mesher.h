@@ -26,6 +26,7 @@ private:
 	PoolVector<int> make_indices(Point2i chunk_size, unsigned int seams);
 
 private:
+	// [seams_mask][lod]
 	Vector< Ref<Mesh> > _mesh_cache[SEAM_CONFIG_COUNT];
 	Point2i _chunk_size;
 };

@@ -49,6 +49,7 @@ public:
 
 	UndoData pop_undo_redo_data(const HeightMapData &heightmap_data);
 
+private:
 	struct UndoCache {
 		HashMap< Point2i, Ref<Image> > chunks;
 		void clear() {
@@ -56,7 +57,6 @@ public:
 		}
 	};
 
-private:
 	void generate_procedural(int radius);
 
 	void paint_height(HeightMapData &data, Point2i cell_pos, float speed);
@@ -64,6 +64,8 @@ private:
 	void flatten_height(HeightMapData &data, Point2i cell_pos);
 	//void paint_indexed_texture(HeightMapData &data, Point2i cell_pos);
 	void paint_color(HeightMapData &data, Point2i cell_pos);
+
+	static void backup_for_undo(const Image &im, UndoCache &undo_cache, Point2i rect_origin, Point2i rect_size);
 
 private:
 	int _radius;

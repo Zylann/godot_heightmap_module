@@ -28,6 +28,8 @@ public:
 	bool is_pending_update() const { return _pending_update; }
 	void set_pending_update(bool pending_update) { _pending_update = pending_update; }
 
+	void set_aabb(Rect3 aabb);
+
 private:
 	bool _visible;
 	bool _active;

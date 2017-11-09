@@ -100,7 +100,6 @@ void HeightMapBrush::paint(HeightMap &height_map, Point2i cell_pos, int override
 	}
 
 	Point2i origin = cell_pos - _shape.size() / 2;
-	HeightMapData::Channel channel = HeightMapData::CHANNEL_COUNT;
 
 	height_map.set_area_dirty(origin, _shape.size());
 
@@ -311,11 +310,11 @@ struct OperatorIndexedTexture {
 	}
 }*/
 
-static bool is_valid_pos(Point2i pos, const Image &im) {
+static inline bool is_valid_pos(Point2i pos, const Image &im) {
 	return !(pos.x < 0 || pos.y < 0 || pos.x >= im.get_width() || pos.y >= im.get_height());
 }
 
-void backup_for_undo(const Image &im, HeightMapBrush::UndoCache &undo_cache, Point2i rect_origin, Point2i rect_size) {
+void HeightMapBrush::backup_for_undo(const Image &im, HeightMapBrush::UndoCache &undo_cache, Point2i rect_origin, Point2i rect_size) {
 
 	// Backup cells before they get changed,
 	// using chunks so that we don't save the entire grid everytime.

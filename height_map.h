@@ -13,6 +13,7 @@ class HeightMap : public Spatial {
 public:
 	//static const int CHUNK_SIZE = 16;
 	// Workaround because GCC doesn't links the line above properly
+	// This is the minimum chunk size
 	enum { CHUNK_SIZE = 16 };
 
 	static const char *SHADER_PARAM_HEIGHT_TEXTURE;

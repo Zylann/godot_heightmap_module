@@ -1,6 +1,6 @@
-#include <core/os/file_access.h>
-#include <core/io/file_access_compressed.h>
 #include <core/array.h>
+#include <core/io/file_access_compressed.h>
+#include <core/os/file_access.h>
 
 #include "height_map.h"
 #include "utility.h"
@@ -19,13 +19,35 @@ const char *HEIGHTMAP_MAGIC_V1 = "GDHM";
 const char *HEIGHTMAP_SUB_V = "v2__";
 
 
+// Important note about heightmap resolution:
+//
+// There is an off-by-one in the data, so for example a map of 512x512 will actually have 513x513 cells.
+// Here is why,
+// If we had an even amount of cells, it would produce this situation when making LOD chunks:
+//
+//   x---x---x---x      x---x---x---x
+//   |   |   |   |      |       |
+//   x---x---x---x      x   x   x   x
+//   |   |   |   |      |       |
+//   x---x---x---x      x---x---x---x
+//   |   |   |   |      |       |
+//   x---x---x---x      x   x   x   x
+//
+//       LOD 0              LOD 1
+//
+// We would be forced to ignore the last cells because they would produce an irregular chunk.
+// We need an off-by-one because quads making up chunks SHARE their consecutive vertices.
+// One quad needs at least 2x2 cells to exist. Two quads of the heightmap share an edge, which needs a total of 3x3 cells, not 4x4.
+// One chunk has 16x16 quads, so it needs 17x17 cells, not 16, where the last cell is shared with the next chunk.
+// As a result, a map of 4x4 chunks needs 65x65 cells, not 64x64.
+
 HeightMapData::HeightMapData() {
 
 	_resolution = 0;
 
-//#ifdef TOOLS_ENABLED
+	//#ifdef TOOLS_ENABLED
 	_disable_apply_undo = false;
-//#endif
+	//#endif
 }
 
 void HeightMapData::load_default() {
@@ -40,7 +62,7 @@ int HeightMapData::get_resolution() const {
 
 void HeightMapData::set_resolution(int p_res) {
 
-	if(p_res == get_resolution())
+	if (p_res == get_resolution())
 		return;
 
 	if (p_res < HeightMap::CHUNK_SIZE)
@@ -55,7 +77,7 @@ void HeightMapData::set_resolution(int p_res) {
 	_resolution = p_res;
 
 	// Resize heights
-	if(_images[CHANNEL_HEIGHT].is_null()) {
+	if (_images[CHANNEL_HEIGHT].is_null()) {
 		_images[CHANNEL_HEIGHT].instance();
 		_images[CHANNEL_HEIGHT]->create(_resolution, _resolution, false, get_channel_format(CHANNEL_HEIGHT));
 	} else {
@@ -63,25 +85,30 @@ void HeightMapData::set_resolution(int p_res) {
 	}
 
 	// Resize normals
-	if(_images[CHANNEL_NORMAL].is_null()) {
+	if (_images[CHANNEL_NORMAL].is_null()) {
 		_images[CHANNEL_NORMAL].instance();
 	}
 	_images[CHANNEL_NORMAL]->create(_resolution, _resolution, false, get_channel_format(CHANNEL_NORMAL));
 	update_all_normals();
 
 	// Resize colors
-	if(_images[CHANNEL_COLOR].is_null()) {
+	if (_images[CHANNEL_COLOR].is_null()) {
 		_images[CHANNEL_COLOR].instance();
 		_images[CHANNEL_COLOR]->create(_resolution, _resolution, false, get_channel_format(CHANNEL_COLOR));
 	} else {
 		_images[CHANNEL_COLOR]->resize(_resolution, _resolution);
 	}
 
-//	for (int i = 0; i < TEXTURE_INDEX_COUNT; ++i) {
-//		// Sum of all weights must be 1, so we fill first slot with 1 and others with 0
-//		texture_weights[i].resize(size, true, i == 0 ? 1 : 0);
-//		texture_indices[i].resize(size, true, 0);
-//	}
+	//	for (int i = 0; i < TEXTURE_INDEX_COUNT; ++i) {
+	//		// Sum of all weights must be 1, so we fill first slot with 1 and others with 0
+	//		texture_weights[i].resize(size, true, i == 0 ? 1 : 0);
+	//		texture_indices[i].resize(size, true, 0);
+	//	}
+
+	Point2i csize = Point2i(p_res, p_res) / HeightMap::CHUNK_SIZE;
+	// TODO Could set `preserve_data` to true, but would require callback to construct new cells
+	_chunked_vertical_bounds.resize(csize, false);
+	update_vertical_bounds();
 
 	emit_signal(SIGNAL_RESOLUTION_CHANGED);
 }
@@ -116,7 +143,7 @@ void HeightMapData::update_normals(Point2i min, Point2i size) {
 	Point2i max = min + size;
 	Point2i pos;
 
-	clamp_min_max_excluded(min, max, Point2i(0,0), Point2i(heights.get_width(), heights.get_height()));
+	clamp_min_max_excluded(min, max, Point2i(0, 0), Point2i(heights.get_width(), heights.get_height()));
 
 	heights.lock();
 	normals.lock();
@@ -141,16 +168,23 @@ void HeightMapData::update_normals(Point2i min, Point2i size) {
 
 void HeightMapData::notify_region_change(Point2i min, Point2i max, HeightMapData::Channel channel) {
 
-	// TODO Hmm not sure if that belongs here
-	switch(channel) {
+	// TODO Hmm not sure if that belongs here // <-- why this, Me from the past?
+	switch (channel) {
 		case CHANNEL_HEIGHT:
+			// TODO Optimization: when drawing very large patches, this might get called too often and would slow down.
+			// for better user experience, we could set chunks AABBs to a very large height just while drawing,
+			// and set correct AABBs as a background task once done
+			update_vertical_bounds(min, max - min);
+
 			upload_region(channel, min, max);
 			upload_region(CHANNEL_NORMAL, min, max);
 			break;
+
 		case CHANNEL_NORMAL:
 		case CHANNEL_COLOR:
 			upload_region(channel, min, max);
 			break;
+
 		default:
 			print_line("Unrecognized channel");
 			break;
@@ -165,9 +199,8 @@ void HeightMapData::notify_region_change(Point2i min, Point2i max, HeightMapData
 // undo_data contains chunked grids of modified terrain in a given channel.
 void HeightMapData::_apply_undo(Dictionary undo_data) {
 
-	if(_disable_apply_undo)
+	if (_disable_apply_undo)
 		return;
-	// TODO Update to use images
 
 	Array chunk_positions = undo_data["chunk_positions"];
 	Array chunk_datas = undo_data["data"];
@@ -176,21 +209,21 @@ void HeightMapData::_apply_undo(Dictionary undo_data) {
 	// Validate input
 
 	ERR_FAIL_COND(channel < 0 || channel >= CHANNEL_COUNT);
-	ERR_FAIL_COND(chunk_positions.size()/2 != chunk_datas.size());
+	ERR_FAIL_COND(chunk_positions.size() / 2 != chunk_datas.size());
 
 	ERR_FAIL_COND(chunk_positions.size() % 2 != 0);
-	for(int i = 0; i < chunk_positions.size(); ++i) {
+	for (int i = 0; i < chunk_positions.size(); ++i) {
 		Variant p = chunk_positions[i];
 		ERR_FAIL_COND(p.get_type() != Variant::INT);
 	}
-	for(int i = 0; i < chunk_datas.size(); ++i) {
+	for (int i = 0; i < chunk_datas.size(); ++i) {
 		Variant d = chunk_datas[i];
 		ERR_FAIL_COND(d.get_type() != Variant::POOL_BYTE_ARRAY);
 	}
 
 	// Apply
 
-	for(int i = 0; i < chunk_datas.size(); ++i) {
+	for (int i = 0; i < chunk_datas.size(); ++i) {
 		Point2i cpos;
 		cpos.x = chunk_positions[2 * i];
 		cpos.y = chunk_positions[2 * i + 1];
@@ -203,14 +236,14 @@ void HeightMapData::_apply_undo(Dictionary undo_data) {
 
 		Rect2 data_rect(0, 0, data->get_width(), data->get_height());
 
-		switch(channel) {
+		switch (channel) {
 
 			case CHANNEL_HEIGHT:
 				ERR_FAIL_COND(_images[channel].is_null())
 				_images[channel]->blit_rect(data, data_rect, min);
 				// Padding is needed because normals are calculated using neighboring,
 				// so a change in height X also requires normals in X-1 and X+1 to be updated
-				update_normals(min - Point2i(1,1), max + Point2i(1,1));
+				update_normals(min - Point2i(1, 1), max + Point2i(1, 1));
 				break;
 
 			case CHANNEL_COLOR:
@@ -235,20 +268,20 @@ void HeightMapData::_apply_undo(Dictionary undo_data) {
 //#endif
 
 void HeightMapData::upload_channel(Channel channel) {
-	upload_region(channel, Point2i(0,0), Point2i(_resolution, _resolution));
+	upload_region(channel, Point2i(0, 0), Point2i(_resolution, _resolution));
 }
 
 void HeightMapData::upload_region(Channel channel, Point2i min, Point2i max) {
 
 	ERR_FAIL_COND(_images[channel].is_null());
 
-	if(_textures[channel].is_null()) {
+	if (_textures[channel].is_null()) {
 		_textures[channel].instance();
 	}
 
 	int flags = 0;
 
-	if(channel == CHANNEL_NORMAL) {
+	if (channel == CHANNEL_NORMAL) {
 		// To allow smooth shading in fragment shader
 		flags |= Texture::FLAG_FILTER;
 	}
@@ -281,24 +314,130 @@ Ref<Image> HeightMapData::get_image(Channel channel) const {
 }
 
 Ref<Texture> HeightMapData::get_texture(Channel channel) {
-	if(_textures[channel].is_null() && _images[channel].is_valid()) {
+	if (_textures[channel].is_null() && _images[channel].is_valid()) {
 		upload_channel(channel);
 	}
 	return _textures[channel];
 }
 
+Rect3 HeightMapData::get_region_aabb(Point2i origin_in_cells, Point2i size_in_cells) {
+
+	// Get info from cached vertical bounds,
+	// which is a lot faster than directly fetching heights from the map.
+	// It's not 100% accurate, but enough for culling use case if chunk size is decently chosen.
+
+	Point2i cpos0 = origin_in_cells / HeightMap::CHUNK_SIZE;
+	Point2i csize = (origin_in_cells + size_in_cells - Point2i(1, 1)) / HeightMap::CHUNK_SIZE + Point2i(1, 1);
+
+	Point2i cmin = cpos0;
+	Point2i cmax = cpos0 + csize;
+
+	float min_height = _chunked_vertical_bounds[0].min;
+	float max_height = min_height;
+
+	for (int y = cmin.y; y < cmax.y; ++y) {
+		for (int x = cmin.x; x < cmax.x; ++x) {
+
+			VerticalBounds b = _chunked_vertical_bounds.get(x, y);
+
+			if (b.min < min_height)
+				min_height = b.min;
+
+			if (b.max > max_height)
+				max_height = b.max;
+		}
+	}
+
+	Rect3 aabb;
+	aabb.position = Vector3(origin_in_cells.x, min_height, origin_in_cells.y);
+	aabb.size = Vector3(size_in_cells.x, max_height - min_height, size_in_cells.y);
+
+	return aabb;
+}
+
+//float HeightMapData::get_estimated_height_at(Point2i pos) {
+//	pos /= HeightMap::CHUNK_SIZE;
+//	pos.x = CLAMP(pos.x, 0, _chunked_vertical_bounds.size().x);
+//	pos.y = CLAMP(pos.y, 0, _chunked_vertical_bounds.size().y);
+//	VerticalBounds b = _chunked_vertical_bounds.get(pos);
+//	return (b.min + b.max) / 2.0;
+//}
+
+void HeightMapData::update_vertical_bounds() {
+	update_vertical_bounds(Point2i(0,0), Point2i(_resolution-1, _resolution-1));
+}
+
+void HeightMapData::update_vertical_bounds(Point2i origin_in_cells, Point2i size_in_cells) {
+
+	Point2i cpos0 = origin_in_cells / HeightMap::CHUNK_SIZE;
+	Point2i csize = (origin_in_cells + size_in_cells - Point2i(1, 1)) / HeightMap::CHUNK_SIZE + Point2i(1, 1);
+
+	Point2i cmin = cpos0;
+	Point2i cmax = cpos0 + csize;
+
+	_chunked_vertical_bounds.clamp_min_max_excluded(cmin, cmax);
+
+	// Note: chunks in _chunked_vertical_bounds share their edge cells and have an actual size of CHUNK_SIZE+1.
+	const Point2i chunk_size(HeightMap::CHUNK_SIZE + 1, HeightMap::CHUNK_SIZE + 1);
+
+	for (int y = cmin.y; y < cmax.y; ++y) {
+		for (int x = cmin.x; x < cmax.x; ++x) {
+
+			int i = _chunked_vertical_bounds.index(x, y);
+			VerticalBounds &b = _chunked_vertical_bounds[i];
+			Point2i min(x * HeightMap::CHUNK_SIZE, y * HeightMap::CHUNK_SIZE);
+			compute_vertical_bounds_at(min, chunk_size, b.min, b.max);
+		}
+	}
+}
+
+void HeightMapData::compute_vertical_bounds_at(Point2i origin, Point2i size, float &out_min, float &out_max) {
+
+	Ref<Image> heights_ref = _images[CHANNEL_HEIGHT];
+	ERR_FAIL_COND(heights_ref.is_null());
+	Image &heights = **heights_ref;
+
+	Point2i min = origin;
+	Point2i max = origin + size;
+
+	heights.lock();
+
+	float min_height = heights.get_pixel(min.x, min.y).r;
+	float max_height = min_height;
+
+	for (int y = min.y; y < max.y; ++y) {
+		for (int x = min.x; x < max.x; ++x) {
+
+			if(x >= heights.get_width())
+				print_line("LOL");
+
+			float h = heights.get_pixel(x, y).r;
+
+			if (h < min_height)
+				min_height = h;
+			else if (h > max_height)
+				max_height = h;
+		}
+	}
+
+	heights.unlock();
+
+	out_min = min_height;
+	out_max = max_height;
+}
+
 Color HeightMapData::encode_normal(Vector3 n) {
 	return Color(
-		0.5 * (n.x + 1.0),
-		0.5 * (n.y + 1.0),
-		0.5 * (n.z + 1.0), 1.0);
+			0.5 * (n.x + 1.0),
+			0.5 * (n.y + 1.0),
+			0.5 * (n.z + 1.0), 1.0);
 }
 
 Vector3 HeightMapData::decode_normal(Color c) {
 	return Vector3(
-		2.0 * c.r - 1.0,
-		2.0 * c.g - 1.0,
-		2.0 * c.b - 1.0);
+			2.0 * c.r - 1.0,
+			2.0 * c.g - 1.0,
+			2.0 * c.b - 1.0);
 }
 
 void HeightMapData::_bind_methods() {
@@ -306,23 +445,25 @@ void HeightMapData::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_resolution", "p_res"), &HeightMapData::set_resolution);
 	ClassDB::bind_method(D_METHOD("get_resolution"), &HeightMapData::get_resolution);
 
-//#ifdef TOOLS_ENABLED
+	//#ifdef TOOLS_ENABLED
 	ClassDB::bind_method(D_METHOD("_apply_undo", "data"), &HeightMapData::_apply_undo);
-//#endif
+	//#endif
 
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "resolution"), "set_resolution", "get_resolution");
+	// This is not saved, because the custom data loader already assigns it.
+	// Setting the STORAGE hint could cause resolution change twice and slowdown loading.
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "resolution", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR), "set_resolution", "get_resolution");
 
 	ADD_SIGNAL(MethodInfo(SIGNAL_RESOLUTION_CHANGED));
 	ADD_SIGNAL(MethodInfo(SIGNAL_REGION_CHANGED,
-						  PropertyInfo(Variant::INT, "min_x"),
-						  PropertyInfo(Variant::INT, "min_y"),
-						  PropertyInfo(Variant::INT, "max_x"),
-						  PropertyInfo(Variant::INT, "max_y"),
-						  PropertyInfo(Variant::INT, "channel")));
+			PropertyInfo(Variant::INT, "min_x"),
+			PropertyInfo(Variant::INT, "min_y"),
+			PropertyInfo(Variant::INT, "max_x"),
+			PropertyInfo(Variant::INT, "max_y"),
+			PropertyInfo(Variant::INT, "channel")));
 }
 
 Image::Format HeightMapData::get_channel_format(Channel channel) {
-	switch(channel) {
+	switch (channel) {
 		case CHANNEL_HEIGHT:
 			return Image::FORMAT_RH;
 		case CHANNEL_NORMAL:
@@ -345,14 +486,14 @@ static void write_channel(FileAccess &f, Ref<Image> img_ref) {
 Error HeightMapData::_save(FileAccess &f) {
 
 	// Sub-version
-	f.store_buffer((const uint8_t*)HEIGHTMAP_SUB_V, 4);
+	f.store_buffer((const uint8_t *)HEIGHTMAP_SUB_V, 4);
 
 	// Size
 	//print_line(String("String saving resolution ") + String::num(_resolution));
 	f.store_32(_resolution);
 	f.store_32(_resolution);
 
-	for(int channel = 0; channel < CHANNEL_COUNT; ++channel) {
+	for (int channel = 0; channel < CHANNEL_COUNT; ++channel) {
 
 		Ref<Image> im = _images[channel];
 		//print_line(String("Saving channel ") + String::num(channel));
@@ -372,7 +513,7 @@ Error HeightMapData::_save(FileAccess &f) {
 
 static void load_channel(Ref<Image> &img_ref, int channel, FileAccess &f, Point2i size) {
 
-	if(img_ref.is_null()) {
+	if (img_ref.is_null()) {
 		img_ref.instance();
 	}
 
@@ -397,10 +538,10 @@ static void load_channel(Ref<Image> &img_ref, int channel, FileAccess &f, Point2
 
 Error HeightMapData::_load(FileAccess &f) {
 
-	char version[5] = {0};
-	f.get_buffer((uint8_t*)version, 4);
+	char version[5] = { 0 };
+	f.get_buffer((uint8_t *)version, 4);
 
-	if(strncmp(version, HEIGHTMAP_SUB_V, 4) != 0) {
+	if (strncmp(version, HEIGHTMAP_SUB_V, 4) != 0) {
 		print_line(String("Invalid version, found {0}, expected {1}").format(varray(version, HEIGHTMAP_SUB_V)));
 		return ERR_FILE_UNRECOGNIZED;
 	}
@@ -417,16 +558,18 @@ Error HeightMapData::_load(FileAccess &f) {
 	ERR_FAIL_COND_V(size.x > MAX_RESOLUTION, ERR_FILE_CORRUPT);
 	ERR_FAIL_COND_V(size.y > MAX_RESOLUTION, ERR_FILE_CORRUPT);
 
-	for(int channel = 0; channel < CHANNEL_COUNT; ++channel) {
+	for (int channel = 0; channel < CHANNEL_COUNT; ++channel) {
 		load_channel(_images[channel], channel, f, size);
 	}
+
+	_chunked_vertical_bounds.resize(size, false);
+	update_vertical_bounds();
 
 	// TODO Texture indices
 	// TODO Texture weights
 
 	return OK;
 }
-
 
 //---------------------------------------
 // Saver
@@ -456,19 +599,18 @@ Error HeightMapDataSaver::save(const String &p_path, const Ref<Resource> &p_reso
 }
 
 bool HeightMapDataSaver::recognize(const Ref<Resource> &p_resource) const {
-	if(p_resource.is_null())
+	if (p_resource.is_null())
 		return false;
 	return Object::cast_to<HeightMapData>(*p_resource) != NULL;
 }
 
 void HeightMapDataSaver::get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions) const {
-	if(p_resource.is_null())
+	if (p_resource.is_null())
 		return;
 	if (Object::cast_to<HeightMapData>(*p_resource)) {
 		p_extensions->push_back(HEIGHTMAP_EXTENSION);
 	}
 }
-
 
 //---------------------------------------
 // Loader
@@ -481,7 +623,7 @@ Ref<Resource> HeightMapDataLoader::load(const String &p_path, const String &p_or
 	Error err = fac->_open(p_path, FileAccess::READ);
 	if (err) {
 		//print_line("Error loading heightmap data");
-		if(r_error)
+		if (r_error)
 			*r_error = err;
 		memdelete(fac);
 		return Ref<Resource>();
@@ -490,8 +632,8 @@ Ref<Resource> HeightMapDataLoader::load(const String &p_path, const String &p_or
 	Ref<HeightMapData> heightmap_data_ref(memnew(HeightMapData));
 
 	err = heightmap_data_ref->_load(*fac);
-	if(err != OK) {
-		if(r_error)
+	if (err != OK) {
+		if (r_error)
 			*r_error = err;
 		memdelete(fac);
 		return Ref<Resource>();
@@ -502,7 +644,7 @@ Ref<Resource> HeightMapDataLoader::load(const String &p_path, const String &p_or
 	// TODO I didn't see examples doing this after close()... how is this freed?
 	//memdelete(fac);
 
-	if(r_error)
+	if (r_error)
 		*r_error = OK;
 	return heightmap_data_ref;
 }
@@ -521,7 +663,3 @@ String HeightMapDataLoader::get_resource_type(const String &p_path) const {
 		return "HeightMapData";
 	return "";
 }
-
-
-
-

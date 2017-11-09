@@ -46,6 +46,9 @@ public:
 	Ref<Texture> get_texture(Channel channel);
 	Ref<Image> get_image(Channel channel) const;
 
+	Rect3 get_region_aabb(Point2i origin_in_cells, Point2i size_in_cells);
+	//float get_estimated_height_at(Point2i pos);
+
 	static Color encode_normal(Vector3 n);
 	static Vector3 decode_normal(Color c);
 
@@ -69,11 +72,24 @@ private:
 	void upload_channel(Channel channel);
 	void upload_region(Channel channel, Point2i min, Point2i max);
 
+	void update_vertical_bounds();
+	void update_vertical_bounds(Point2i min, Point2i max);
+	void compute_vertical_bounds_at(Point2i origin, Point2i size, float &out_min, float &out_max);
+
 private:
 	int _resolution;
 
 	Ref<ImageTexture> _textures[CHANNEL_COUNT];
 	Ref<Image> _images[CHANNEL_COUNT];
+
+	struct VerticalBounds {
+		float min;
+		float max;
+		VerticalBounds() : min(0), max(0) {}
+		VerticalBounds(float p_min, float p_max) : min(p_min), max(p_max) {}
+	};
+
+	Grid2D<VerticalBounds> _chunked_vertical_bounds;
 };
 
 
