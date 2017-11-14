@@ -326,11 +326,8 @@ Rect3 HeightMapData::get_region_aabb(Point2i origin_in_cells, Point2i size_in_ce
 	// which is a lot faster than directly fetching heights from the map.
 	// It's not 100% accurate, but enough for culling use case if chunk size is decently chosen.
 
-	Point2i cpos0 = origin_in_cells / HeightMap::CHUNK_SIZE;
-	Point2i csize = (origin_in_cells + size_in_cells - Point2i(1, 1)) / HeightMap::CHUNK_SIZE + Point2i(1, 1);
-
-	Point2i cmin = cpos0;
-	Point2i cmax = cpos0 + csize;
+	Point2i cmin = origin_in_cells / HeightMap::CHUNK_SIZE;
+	Point2i cmax = (origin_in_cells + size_in_cells - Point2i(1, 1)) / HeightMap::CHUNK_SIZE + Point2i(1, 1);
 
 	float min_height = _chunked_vertical_bounds[0].min;
 	float max_height = min_height;
@@ -369,11 +366,8 @@ void HeightMapData::update_vertical_bounds() {
 
 void HeightMapData::update_vertical_bounds(Point2i origin_in_cells, Point2i size_in_cells) {
 
-	Point2i cpos0 = origin_in_cells / HeightMap::CHUNK_SIZE;
-	Point2i csize = (origin_in_cells + size_in_cells - Point2i(1, 1)) / HeightMap::CHUNK_SIZE + Point2i(1, 1);
-
-	Point2i cmin = cpos0;
-	Point2i cmax = cpos0 + csize;
+	Point2i cmin = origin_in_cells / HeightMap::CHUNK_SIZE;
+	Point2i cmax = (origin_in_cells + size_in_cells - Point2i(1, 1)) / HeightMap::CHUNK_SIZE + Point2i(1, 1);
 
 	_chunked_vertical_bounds.clamp_min_max_excluded(cmin, cmax);
 
@@ -407,9 +401,6 @@ void HeightMapData::compute_vertical_bounds_at(Point2i origin, Point2i size, flo
 
 	for (int y = min.y; y < max.y; ++y) {
 		for (int x = min.x; x < max.x; ++x) {
-
-			if(x >= heights.get_width())
-				print_line("LOL");
 
 			float h = heights.get_pixel(x, y).r;
 

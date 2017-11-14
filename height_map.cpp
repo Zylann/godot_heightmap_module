@@ -425,7 +425,7 @@ void HeightMap::add_chunk_update(HeightMapChunk &chunk, Point2i pos, int lod) {
 void HeightMap::set_area_dirty(Point2i origin_in_cells, Point2i size_in_cells) {
 
 	Point2i cpos0 = origin_in_cells / CHUNK_SIZE;
-	Point2i csize = (origin_in_cells + size_in_cells - Point2i(1,1)) / CHUNK_SIZE + Point2i(1,1);
+	Point2i csize = (size_in_cells - Point2i(1,1)) / CHUNK_SIZE + Point2i(1,1);
 
 	// For each lod
 	for (int lod = 0; lod < _chunks.size(); ++lod) {
