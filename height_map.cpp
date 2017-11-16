@@ -507,7 +507,7 @@ bool HeightMap::cell_raycast(Vector3 origin_world, Vector3 dir_world, Point2i &o
 
 	Transform to_local = get_global_transform().affine_inverse();
 	Vector3 origin = to_local.xform(origin_world);
-	Vector3 dir = to_local.xform(dir_world);
+	Vector3 dir = to_local.basis.xform(dir_world);
 
 	LockImage lock(heights_ref);
 
