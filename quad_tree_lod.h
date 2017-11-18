@@ -61,7 +61,7 @@ public:
 
 		_max_depth = 0;
 		_base_size = 0;
-		_split_scale = 3;
+		_split_scale = 2;
 
 		_callbacks_context = NULL;
 		_make_func = NULL;
