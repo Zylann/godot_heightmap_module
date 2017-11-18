@@ -46,7 +46,7 @@ public:
 	Ref<Texture> get_texture(Channel channel);
 	Ref<Image> get_image(Channel channel) const;
 
-	Rect3 get_region_aabb(Point2i origin_in_cells, Point2i size_in_cells);
+	AABB get_region_aabb(Point2i origin_in_cells, Point2i size_in_cells);
 	//float get_estimated_height_at(Point2i pos);
 
 	static Color encode_normal(Vector3 n);

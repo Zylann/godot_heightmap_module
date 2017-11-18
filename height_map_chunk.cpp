@@ -84,7 +84,7 @@ void HeightMapChunk::set_visible(bool visible) {
 	vs.instance_set_visible(_mesh_instance, visible);
 }
 
-void HeightMapChunk::set_aabb(Rect3 aabb) {
+void HeightMapChunk::set_aabb(AABB aabb) {
 	ERR_FAIL_COND(_mesh_instance.is_valid() == false);
 	// TODO Need feature in VisualServer
 	//VisualServer &vs = *VisualServer::get_singleton();

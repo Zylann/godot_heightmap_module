@@ -320,7 +320,7 @@ Ref<Texture> HeightMapData::get_texture(Channel channel) {
 	return _textures[channel];
 }
 
-Rect3 HeightMapData::get_region_aabb(Point2i origin_in_cells, Point2i size_in_cells) {
+AABB HeightMapData::get_region_aabb(Point2i origin_in_cells, Point2i size_in_cells) {
 
 	// Get info from cached vertical bounds,
 	// which is a lot faster than directly fetching heights from the map.
@@ -345,7 +345,7 @@ Rect3 HeightMapData::get_region_aabb(Point2i origin_in_cells, Point2i size_in_ce
 		}
 	}
 
-	Rect3 aabb;
+	AABB aabb;
 	aabb.position = Vector3(origin_in_cells.x, min_height, origin_in_cells.y);
 	aabb.size = Vector3(size_in_cells.x, max_height - min_height, size_in_cells.y);
 

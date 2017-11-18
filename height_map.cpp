@@ -463,7 +463,7 @@ void HeightMap::update_chunk(HeightMapChunk &chunk, int lod) {
 
 	// Because chunks are rendered using vertex shader displacement, the renderer cannot rely on the mesh's AABB.
 	int s = CHUNK_SIZE << lod;
-	Rect3 aabb = _data->get_region_aabb(chunk.cell_origin, Point2i(s,s));
+	AABB aabb = _data->get_region_aabb(chunk.cell_origin, Point2i(s,s));
 	aabb.position.x = 0;
 	aabb.position.z = 0;
 	chunk.set_aabb(aabb);
