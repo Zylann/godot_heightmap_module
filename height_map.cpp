@@ -62,6 +62,14 @@ namespace {
 		}
 	};
 
+	struct SetMaterialAction {
+		Ref<ShaderMaterial> material;
+		SetMaterialAction(Ref<ShaderMaterial> m) : material(m) {}
+		void operator()(HeightMapChunk &chunk) {
+			chunk.set_material(material);
+		}
+	};
+
 	Ref<Shader> s_default_shader;
 }
 
@@ -164,21 +172,32 @@ void HeightMap::_on_data_region_changed(int min_x, int min_y, int max_x, int max
 	set_area_dirty(Point2i(min_x, min_y), Point2i(max_x - min_x, max_y - min_y));
 }
 
-void HeightMap::set_custom_shader(Ref<Shader> p_shader) {
+void HeightMap::set_custom_material(Ref<ShaderMaterial> p_material) {
 
-	if (_custom_shader != p_shader) {
-		_custom_shader = p_shader;
+	if (_custom_material != p_material) {
+		_custom_material = p_material;
+
+		if(_custom_material.is_valid()) {
 
 #ifdef TOOLS_ENABLED
-		// When the new shader is empty, allows to fork from the default shader
-		if(is_inside_tree() && Engine::get_singleton()->is_editor_hint()) {
-			if(p_shader.is_valid()) {
-				if(p_shader->get_code().empty()) {
-					p_shader->set_code(s_default_shader_code);
+			if(is_inside_tree() && Engine::get_singleton()->is_editor_hint()) {
+
+				// When the new shader is empty, allows to fork from the default shader
+
+				if(_custom_material->get_shader().is_null()) {
+					_custom_material->set_shader(memnew(Shader));
+				}
+
+				Ref<Shader> shader = _custom_material->get_shader();
+				if(shader.is_valid()) {
+					if(shader->get_code().empty()) {
+						shader->set_code(s_default_shader_code);
+					}
+					// TODO If code isn't empty, verify existing parameters and issue a warning if important ones are missing
 				}
 			}
-		}
 #endif
+		}
 
 		update_material();
 	}
@@ -186,11 +205,66 @@ void HeightMap::set_custom_shader(Ref<Shader> p_shader) {
 
 void HeightMap::update_material() {
 
-	if(_material.is_null()) {
-		_material.instance();
+	bool instance_changed = false;
+
+	if(_custom_material.is_valid()) {
+
+		if(_custom_material != _material) {
+			// Duplicate material but not the shader.
+			// This is to ensure that users don't end up with internal textures assigned in the editor,
+			// which could end up being saved as regular textures (which is not intented).
+			// Also the HeightMap may use multiple instances of the material in the future,
+			// if chunks need different params or use multiple textures (streaming)
+			_material = _custom_material->duplicate(false);
+			instance_changed = true;
+		}
+
+	} else {
+
+		if(_material.is_null()) {
+			_material.instance();
+			instance_changed = true;
+		}
+
+		_material->set_shader(s_default_shader);
 	}
-	Ref<Shader> sh = s_default_shader;
-	_material->set_shader(_custom_shader.is_null() ? sh : _custom_shader);
+
+	if(instance_changed) {
+		for_all_chunks(SetMaterialAction(_material));
+	}
+
+	update_material_params();
+}
+
+void HeightMap::update_material_params() {
+
+	ERR_FAIL_COND(_material.is_null());
+	ShaderMaterial &material = **_material;
+
+	if(_custom_material.is_valid()) {
+		// Copy all parameters from the custom material into the internal one
+		// TODO We could get rid of this every frame if ShaderMaterial had a signal when a parameter changes...
+
+		Ref<Shader> from_shader = _custom_material->get_shader();
+		Ref<Shader> to_shader = _material->get_shader();
+
+		ERR_FAIL_COND(from_shader.is_null());
+		ERR_FAIL_COND(to_shader.is_null());
+		// If that one fails, it means there is a bug in HeightMap code
+		ERR_FAIL_COND(from_shader != to_shader);
+
+		// TODO Getting params could be optimized, by connecting to the Shader.changed signal and caching them
+
+		List<PropertyInfo> params;
+		VisualServer::get_singleton()->shader_get_param_list(from_shader->get_rid(), &params);
+
+		ShaderMaterial &custom_material = **_custom_material;
+
+		for (List<PropertyInfo>::Element *E = params.front(); E; E = E->next()) {
+			const PropertyInfo &pi = E->get();
+			material.set_shader_param(pi.name, custom_material.get_shader_param(pi.name));
+		}
+	}
 
 	Ref<Texture> height_texture;
 	Ref<Texture> normal_texture;
@@ -208,13 +282,13 @@ void HeightMap::update_material() {
 	if(is_inside_tree()) {
 		Transform gt = get_global_transform();
 		Transform t = gt.affine_inverse();
-		_material->set_shader_param(SHADER_PARAM_INVERSE_TRANSFORM, t);
+		material.set_shader_param(SHADER_PARAM_INVERSE_TRANSFORM, t);
 	}
 
-	_material->set_shader_param(SHADER_PARAM_HEIGHT_TEXTURE, height_texture);
-	_material->set_shader_param(SHADER_PARAM_NORMAL_TEXTURE, normal_texture);
-	_material->set_shader_param(SHADER_PARAM_COLOR_TEXTURE, color_texture);
-	_material->set_shader_param(SHADER_PARAM_RESOLUTION, res);
+	material.set_shader_param(SHADER_PARAM_HEIGHT_TEXTURE, height_texture);
+	material.set_shader_param(SHADER_PARAM_NORMAL_TEXTURE, normal_texture);
+	material.set_shader_param(SHADER_PARAM_COLOR_TEXTURE, color_texture);
+	material.set_shader_param(SHADER_PARAM_RESOLUTION, res);
 }
 
 void HeightMap::set_collision_enabled(bool enabled) {
@@ -540,8 +614,8 @@ void HeightMap::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_data"), &HeightMap::get_data);
 	ClassDB::bind_method(D_METHOD("set_data", "data"), &HeightMap::set_data);
 
-	ClassDB::bind_method(D_METHOD("get_custom_shader"), &HeightMap::get_custom_shader);
-	ClassDB::bind_method(D_METHOD("set_custom_shader", "shader"), &HeightMap::set_custom_shader);
+	ClassDB::bind_method(D_METHOD("get_custom_material"), &HeightMap::get_custom_material);
+	ClassDB::bind_method(D_METHOD("set_custom_material", "material"), &HeightMap::set_custom_material);
 
 	ClassDB::bind_method(D_METHOD("is_collision_enabled"), &HeightMap::is_collision_enabled);
 	ClassDB::bind_method(D_METHOD("set_collision_enabled", "enabled"), &HeightMap::set_collision_enabled);
@@ -553,7 +627,7 @@ void HeightMap::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("_on_data_region_changed", "x", "y", "w", "h", "c"), &HeightMap::_on_data_region_changed);
 
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "data", PROPERTY_HINT_RESOURCE_TYPE, "HeightMapData"), "set_data", "get_data");
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "custom_shader", PROPERTY_HINT_RESOURCE_TYPE, "Shader"), "set_custom_shader", "get_custom_shader");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "custom_material", PROPERTY_HINT_RESOURCE_TYPE, "ShaderMaterial"), "set_custom_material", "get_custom_material");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "collision_enabled"), "set_collision_enabled", "is_collision_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "lod_scale"), "set_lod_scale", "get_lod_scale");
 }

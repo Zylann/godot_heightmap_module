@@ -28,8 +28,8 @@ public:
 	void set_data(Ref<HeightMapData> data);
 	Ref<HeightMapData> get_data() { return _data; }
 
-	void set_custom_shader(Ref<Shader> p_shader);
-	inline Ref<Shader> get_custom_shader() const { return _custom_shader; }
+	void set_custom_material(Ref<ShaderMaterial> p_material);
+	inline Ref<ShaderMaterial> get_custom_material() const { return _custom_material; }
 
 	void set_collision_enabled(bool enabled);
 	inline bool is_collision_enabled() const { return _collision_enabled; }
@@ -52,6 +52,7 @@ private:
 	void _process();
 
 	void update_material();
+	void update_material_params();
 
 	HeightMapChunk *_make_chunk_cb(Point2i cpos, int lod);
 	void _recycle_chunk_cb(HeightMapChunk *chunk);
@@ -86,7 +87,7 @@ private:
 	}
 
 private:
-	Ref<Shader> _custom_shader;
+	Ref<ShaderMaterial> _custom_material;
 	Ref<ShaderMaterial> _material;
 	bool _collision_enabled;
 	Ref<HeightMapData> _data;
