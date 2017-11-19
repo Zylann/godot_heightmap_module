@@ -18,12 +18,13 @@ HeightMapEditorPlugin::HeightMapEditorPlugin(EditorNode *p_editor) {
 
 	_panel = memnew(HeightMapEditorPanel);
 	_panel->connect(HeightMapEditorPanel::SIGNAL_TEXTURE_INDEX_SELECTED, this, "_on_texture_index_selected");
-	HeightMapBrushEditor &brush_panel = _panel->get_brush_editor();
-	brush_panel.connect(HeightMapBrushEditor::SIGNAL_PARAM_CHANGED, this, "_on_brush_param_changed");
-	brush_panel.init_params(
+	HeightMapBrushEditor &brush_editor = _panel->get_brush_editor();
+	brush_editor.init_params(
 			_brush.get_radius(),
 			_brush.get_opacity(),
-			_brush.get_flatten_height());
+			_brush.get_flatten_height(),
+			_brush.get_color());
+	brush_editor.connect(HeightMapBrushEditor::SIGNAL_PARAM_CHANGED, this, "_on_brush_param_changed");
 	add_control_to_container(CONTAINER_SPATIAL_EDITOR_BOTTOM, _panel);
 	_panel->hide();
 

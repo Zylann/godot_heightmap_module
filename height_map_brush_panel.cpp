@@ -5,7 +5,6 @@
 #include "scene/gui/file_dialog.h"
 #include "scene/gui/item_list.h"
 #include "scene/gui/color_rect.h"
-#include "scene/gui/color_picker.h"
 
 const char *HeightMapBrushEditor::SIGNAL_PARAM_CHANGED = "param_changed";
 
@@ -75,21 +74,23 @@ HeightMapBrushEditor::HeightMapBrushEditor() {
 	}
 	y += spacing;
 	{
-		ColorPickerButton *color_picker = memnew(ColorPickerButton);
-		color_picker->set_position(Vector2(10, y));
-		color_picker->set_size(Vector2(100, 24));
-		color_picker->get_picker()->connect("color_changed", this, "_on_param_changed", varray(BRUSH_COLOR));
-		add_child(color_picker);
+		_color_picker = memnew(ColorPickerButton);
+		_color_picker->set_position(Vector2(10, y));
+		_color_picker->set_size(Vector2(100, 24));
+		_color_picker->get_picker()->connect("color_changed", this, "_on_param_changed", varray(BRUSH_COLOR));
+		add_child(_color_picker);
 	}
 }
 
 HeightMapBrushEditor::~HeightMapBrushEditor() {
 }
 
-void HeightMapBrushEditor::init_params(int size, float opacity, float height) {
+void HeightMapBrushEditor::init_params(int size, float opacity, float height, Color color) {
+
 	_size_slider->set_value(size);
 	_opacity_slider->set_as_ratio(opacity);
 	_height_edit->set_value(height);
+	_color_picker->set_pick_color(color);
 
 	_size_label->set_text(String::num(size));
 	_opacity_label->set_text(String::num(opacity));

@@ -8,7 +8,7 @@ HeightMapBrush::HeightMapBrush() {
 	_mode = MODE_ADD;
 	_flatten_height = 0;
 	_texture_index = 0;
-	_color = Color(1, 0, 0, 0);
+	_color = Color(1, 1, 1, 1);
 }
 
 void HeightMapBrush::set_mode(Mode mode) {

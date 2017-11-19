@@ -5,6 +5,7 @@
 #include <scene/gui/slider.h>
 #include <scene/gui/spin_box.h>
 #include <scene/gui/split_container.h>
+#include <scene/gui/color_picker.h>
 
 class HeightMapBrushEditor : public Control {
 	GDCLASS(HeightMapBrushEditor, Control)
@@ -22,7 +23,7 @@ public:
 		BRUSH_HEIGHT
 	};
 
-	void init_params(int size, float opacity, float height);
+	void init_params(int size, float opacity, float height, Color color);
 
 protected:
 	static void _bind_methods();
@@ -38,6 +39,7 @@ private:
 	Slider *_opacity_slider;
 
 	SpinBox *_height_edit;
+	ColorPickerButton *_color_picker;
 };
 
 class HeightMapEditorPanel : public Control {
