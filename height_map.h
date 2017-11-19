@@ -19,6 +19,8 @@ public:
 	static const char *SHADER_PARAM_HEIGHT_TEXTURE;
 	static const char *SHADER_PARAM_NORMAL_TEXTURE;
 	static const char *SHADER_PARAM_COLOR_TEXTURE;
+	static const char *SHADER_PARAM_SPLAT_TEXTURE;
+	static const char *SHADER_PARAM_MASK_TEXTURE;
 	static const char *SHADER_PARAM_RESOLUTION;
 	static const char *SHADER_PARAM_INVERSE_TRANSFORM;
 

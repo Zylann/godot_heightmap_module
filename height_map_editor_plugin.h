@@ -24,9 +24,12 @@ protected:
 	static void _bind_methods();
 
 private:
-	void _mode_selected(int mode);
-	void _brush_param_changed(Variant value, int param);
+	void _mode_selected(HeightMapBrush::Mode mode);
+	void _brush_param_changed(Variant value, HeightMapBrushEditor::Param param);
+	void _on_texture_index_selected(int index);
 	void _height_map_exited_scene();
+	void _menu_item_selected(int id);
+	void _import_file_selected(String p_path);
 
 	void _import_raw_file_selected(String path);
 	void _import_raw_file();
@@ -34,12 +37,17 @@ private:
 	void paint(Camera &camera, Vector2 screen_pos, int override_mode = -1);
 
 private:
+	enum MenuItems {
+		MENU_IMPORT_RAW = 0
+	};
+
 	EditorNode *_editor;
 	HeightMap *_height_map;
-	HeightMapBrushPanel *_brush_panel;
+	HeightMapEditorPanel *_panel;
 	HBoxContainer *_toolbar;
 	HeightMapBrush _brush;
 
+	FileDialog *_import_dialog;
 	String _import_file_path;
 	ConfirmationDialog *_import_confirmation_dialog;
 	AcceptDialog *_accept_dialog;

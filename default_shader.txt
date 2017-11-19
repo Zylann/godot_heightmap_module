@@ -3,6 +3,8 @@ shader_type spatial;
 uniform sampler2D height_texture;
 uniform sampler2D normal_texture;
 uniform sampler2D color_texture;
+uniform sampler2D splat_texture;
+uniform sampler2D mask_texture;
 uniform vec2 heightmap_resolution;
 uniform mat4 heightmap_inverse_transform;
 
@@ -20,7 +22,16 @@ void vertex() {
 }
 
 void fragment() {
+
+	float mask = texture(mask_texture).r;
+	if(mask > 0.5)
+		discard;
+
 	vec3 n = unpack_normal(texture(normal_texture, UV).rgb);
 	NORMAL = (INV_CAMERA_MATRIX * (WORLD_MATRIX * vec4(n, 0.0))).xyz;
+
+	// TODO texture splatting
+
+	ALBEDO = texture(color_texture, UV).rgb;
 }
 

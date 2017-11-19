@@ -7,7 +7,7 @@ HeightMapBrush::HeightMapBrush() {
 	_shape_sum = 0;
 	_mode = MODE_ADD;
 	_flatten_height = 0;
-	//_texture_index = 0;
+	_texture_index = 0;
 	_color = Color(1, 0, 0, 0);
 }
 
@@ -39,10 +39,11 @@ void HeightMapBrush::set_flatten_height(float flatten_height) {
 	_flatten_height = flatten_height;
 }
 
-//void HeightMapBrush::set_texture_index(int tid) {
-//	ERR_FAIL_COND(tid < 0);
-//	_texture_index = tid;
-//}
+void HeightMapBrush::set_texture_index(int tid) {
+	ERR_FAIL_COND(tid < 0);
+	ERR_FAIL_COND(tid > 255);
+	_texture_index = tid;
+}
 
 void HeightMapBrush::set_color(Color c) {
 	// Color might be useful for custom shading
@@ -79,6 +80,10 @@ HeightMapData::Channel HeightMapBrush::get_mode_channel(Mode mode) {
 		return HeightMapData::CHANNEL_HEIGHT;
 	case MODE_COLOR:
 		return HeightMapData::CHANNEL_COLOR;
+	case MODE_SPLAT:
+		return HeightMapData::CHANNEL_SPLAT;
+	case MODE_MASK:
+		return HeightMapData::CHANNEL_MASK;
 	default:
 		print_line("This mode has no channel");
 		break;
@@ -104,6 +109,7 @@ void HeightMapBrush::paint(HeightMap &height_map, Point2i cell_pos, int override
 	height_map.set_area_dirty(origin, _shape.size());
 
 	switch (mode) {
+
 		case MODE_ADD:
 			paint_height(data, origin, 50.0 * delta);
 			break;
@@ -120,13 +126,16 @@ void HeightMapBrush::paint(HeightMap &height_map, Point2i cell_pos, int override
 			flatten_height(data, origin);
 			break;
 
-//		case MODE_TEXTURE:
-//			// TODO Undo for this when we are sure it works
-//			paint_indexed_texture(data, origin);
-//			break;
+		case MODE_SPLAT:
+			paint_splat(data, origin);
+			break;
 
 		case MODE_COLOR:
 			paint_color(data, origin);
+			break;
+
+		case MODE_MASK:
+			paint_mask(data, origin);
 			break;
 
 		default:
@@ -214,82 +223,6 @@ struct OperatorLerpColor {
 		_im.set_pixel(pos.x, pos.y, c);
 	}
 };
-
-// TODO Experiment indexed texturing
-#if 0
-struct OperatorIndexedTexture {
-
-	int texture_index;
-
-	OperatorIndexedTexture(int p_texture_index)
-		: texture_index(p_texture_index) {}
-
-	void operator()(HeightMapData &data, Point2i pos, float v) {
-
-		// TODO There is potential for bad blending using this local algorithm,
-		// neighbors should be taken into account I think
-
-		int loc = data.texture_weights[0].index(pos);
-
-		int slot_index = -1;
-
-		// Find if the texture already has a slot
-		for (int i = 0; i < HeightMapData::TEXTURE_INDEX_COUNT; ++i) {
-			if (data.texture_indices[slot_index][loc] == texture_index) {
-				slot_index = i;
-				break;
-			}
-		}
-
-		if (slot_index == -1) {
-			// Need to assign a slot to the texture
-
-			// Find the lowest weight
-			float lowest_weight = 2;
-			for (int i = 0; i < HeightMapData::TEXTURE_INDEX_COUNT; ++i) {
-				float w = data.texture_weights[i][loc];
-				if (w < lowest_weight) {
-					lowest_weight = w;
-					slot_index = i;
-				}
-			}
-
-			// Replace old weight by new one
-			data.texture_indices[slot_index][loc] = texture_index;
-			data.texture_weights[slot_index][loc] = 0;
-		}
-
-		// Weights sum should always initially be 1
-		float weight_sum = 1;
-
-		// Exclude the slot we are modifying
-		weight_sum -= data.texture_weights[slot_index][loc];
-
-		// Modify slot's weight
-		float w = data.texture_weights[slot_index][loc];
-		w = Math::lerp(w, 1, v);
-		data.texture_weights[slot_index][loc] = w;
-
-		// Make sure the other slots give a sum of 1
-		float k = 0;
-		if (weight_sum > 0.01)
-			k = (1.f - w) / weight_sum;
-		for (int i = 0; i < HeightMapData::TEXTURE_INDEX_COUNT; ++i) {
-			if (i != slot_index)
-				data.texture_weights[i][loc] *= k;
-		}
-
-		// Debug check:
-		// Really make sure weights sum is 1
-		weight_sum = 0;
-		for (int i = 0; i < HeightMapData::TEXTURE_INDEX_COUNT; ++i) {
-			weight_sum += data.texture_weights[i][loc];
-		}
-		if (weight_sum > 1.001)
-			print_line(String("Sum is above 1: {0}").format(varray(weight_sum)));
-	}
-};
-#endif
 
 /*static void debug_print_cache(const HeightMapBrush::UndoCache &cache, Point2i anchor) {
 	print_line(" ");
@@ -403,39 +336,45 @@ void HeightMapBrush::flatten_height(HeightMapData &data, Point2i origin) {
 	data.update_normals(origin, _shape.size());
 }
 
-#if 0
-void HeightMapBrush::paint_indexed_texture(HeightMapData &data, Point2i origin) {
+void HeightMapBrush::paint_splat(HeightMapData &data, Point2i origin) {
 
-	OperatorIndexedTexture op(_texture_index);
-	foreach_xy(op, data, origin, 1, _opacity, _shape);
+	Ref<Image> im_ref = data.get_image(HeightMapData::CHANNEL_SPLAT);
+	ERR_FAIL_COND(im_ref.is_null());
+	Image &im = **im_ref;
 
-	// TODO Implement texture arrays or 3D textures in shaders so that we can see the result
+	im.lock();
+	backup_for_undo(im, _undo_cache, origin, _shape.size());
+	im.unlock();
 
-	// The idea is that, in a fragment shader, we can do this for a cheap cost and any number of textures:
+	Point2i shape_size = _shape.size();
 
-	// c += texture3D(s, vec3(uv.xy, indices.x)) * weigths.x;
-	// c += texture3D(s, vec3(uv.xy, indices.y)) * weigths.y;
-	// c += texture3D(s, vec3(uv.xy, indices.z)) * weigths.z;
-	// c += texture3D(s, vec3(uv.xy, indices.w)) * weigths.w;
+	Point2i min = origin;
+	Point2i max = min + shape_size;
 
-	// or
+	clamp_min_max_excluded(min, max, Point2i(0,0), Point2i(data.get_resolution(), data.get_resolution()));
 
-	// c += textureArray(s, vec3(uv.xy, indices.x)) * weigths.x;
-	// c += textureArray(s, vec3(uv.xy, indices.y)) * weigths.y;
-	// c += textureArray(s, vec3(uv.xy, indices.z)) * weigths.z;
-	// c += textureArray(s, vec3(uv.xy, indices.w)) * weigths.w;
+	Point2i pos;
+	const float shape_threshold = 0.1;
 
-	// Note: binary combination of 16 textures works too but the method above is more efficient and scalable in GLES3
+	LockImage lock(im_ref);
 
-	// So what we do in the editor is:
-	// paint textures as blend factors, automatically choose indices based on
-	// which textures are the most visible, and discard the others.
-	// (a bit like a local dynamic color palette, but with textures)
-	// Most of the time there will be only 1 or 2 textures used in a given point,
-	// but to handle transitions correctly there should be at least 4 slots.
-	// Then this information will be translated into vertices at meshing time.
+	for (pos.y = min.y; pos.y < max.y; ++pos.y) {
+		for (pos.x = min.x; pos.x < max.x; ++pos.x) {
+
+			float shape_value = _shape.get(pos - min);
+
+			if(shape_value > shape_threshold) {
+
+				// TODO Improve weight blending, it looks meh
+
+				Color c;
+				c.r = static_cast<float>(_texture_index) / 256.0;
+				c.g = CLAMP(_opacity, 0.0, 1.0);
+				im.set_pixel(pos.x, pos.y, c);
+			}
+		}
+	}
 }
-#endif
 
 void HeightMapBrush::paint_color(HeightMapData &data, Point2i origin) {
 
@@ -448,6 +387,41 @@ void HeightMapBrush::paint_color(HeightMapData &data, Point2i origin) {
 
 	OperatorLerpColor op(_color, **im_ref);
 	foreach_xy(op, data, origin, 1, _opacity, _shape);
+}
+
+void HeightMapBrush::paint_mask(HeightMapData &data, Point2i origin) {
+
+	Ref<Image> im_ref = data.get_image(HeightMapData::CHANNEL_MASK);
+	ERR_FAIL_COND(im_ref.is_null());
+	Image &im = **im_ref;
+
+	im.lock();
+	backup_for_undo(im, _undo_cache, origin, _shape.size());
+	im.unlock();
+
+	Point2i shape_size = _shape.size();
+
+	Point2i min = origin;
+	Point2i max = min + shape_size;
+
+	clamp_min_max_excluded(min, max, Point2i(0,0), Point2i(data.get_resolution(), data.get_resolution()));
+
+	Point2i pos;
+	const float shape_threshold = 0.1;
+	const Color value = _opacity > 0.5 ? Color(1.0, 0.0, 0.0, 0.0) : Color();
+
+	LockImage lock(im_ref);
+
+	for (pos.y = min.y; pos.y < max.y; ++pos.y) {
+		for (pos.x = min.x; pos.x < max.x; ++pos.x) {
+
+			float shape_value = _shape.get(pos - min);
+
+			if(shape_value > shape_threshold) {
+				im.set_pixel(pos.x, pos.y, value);
+			}
+		}
+	}
 }
 
 static Array fetch_redo_chunks(const Image &im, const List<Point2i> &keys) {

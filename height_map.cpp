@@ -8,17 +8,12 @@
 const char *HeightMap::SHADER_PARAM_HEIGHT_TEXTURE = "height_texture";
 const char *HeightMap::SHADER_PARAM_NORMAL_TEXTURE = "normal_texture";
 const char *HeightMap::SHADER_PARAM_COLOR_TEXTURE = "color_texture";
+const char *HeightMap::SHADER_PARAM_SPLAT_TEXTURE = "splat_texture";
+const char *HeightMap::SHADER_PARAM_MASK_TEXTURE = "mask_texture";
 const char *HeightMap::SHADER_PARAM_RESOLUTION = "heightmap_resolution";
 const char *HeightMap::SHADER_PARAM_INVERSE_TRANSFORM = "heightmap_inverse_transform";
 
 namespace {
-
-//	struct SetMaterialAction {
-//		Ref<Material> material;
-//		void operator()(HeightMapChunk &chunk) {
-//			chunk.set_material(material);
-//		}
-//	};
 
 	struct EnterWorldAction {
 		World *world;
@@ -269,12 +264,18 @@ void HeightMap::update_material_params() {
 	Ref<Texture> height_texture;
 	Ref<Texture> normal_texture;
 	Ref<Texture> color_texture;
+	Ref<Texture> splat_texture;
+	Ref<Texture> mask_texture;
 	Vector2 res(-1,-1);
+
+	// TODO Only get textures the shader supports
 
 	if(_data.is_valid()) {
 		height_texture = _data->get_texture(HeightMapData::CHANNEL_HEIGHT);
 		normal_texture = _data->get_texture(HeightMapData::CHANNEL_NORMAL);
 		color_texture = _data->get_texture(HeightMapData::CHANNEL_COLOR);
+		splat_texture = _data->get_texture(HeightMapData::CHANNEL_SPLAT);
+		mask_texture = _data->get_texture(HeightMapData::CHANNEL_MASK);
 		res.x = _data->get_resolution();
 		res.y = res.x;
 	}
@@ -288,6 +289,8 @@ void HeightMap::update_material_params() {
 	material.set_shader_param(SHADER_PARAM_HEIGHT_TEXTURE, height_texture);
 	material.set_shader_param(SHADER_PARAM_NORMAL_TEXTURE, normal_texture);
 	material.set_shader_param(SHADER_PARAM_COLOR_TEXTURE, color_texture);
+	material.set_shader_param(SHADER_PARAM_SPLAT_TEXTURE, splat_texture);
+	material.set_shader_param(SHADER_PARAM_MASK_TEXTURE, mask_texture);
 	material.set_shader_param(SHADER_PARAM_RESOLUTION, res);
 }
 

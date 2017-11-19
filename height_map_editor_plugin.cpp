@@ -1,6 +1,7 @@
 #include <core/os/input.h>
 #include <scene/3d/camera.h>
 #include <scene/scene_string_names.h>
+#include <scene/gui/color_rect.h>
 
 #include "height_map_editor_plugin.h"
 
@@ -15,35 +16,45 @@ HeightMapEditorPlugin::HeightMapEditorPlugin(EditorNode *p_editor) {
 
 	_brush.set_radius(5);
 
-	_brush_panel = memnew(HeightMapBrushPanel);
-	_brush_panel->connect(HeightMapBrushPanel::PARAM_CHANGED, this, "_on_brush_param_changed");
-	_brush_panel->connect(HeightMapBrushPanel::SIGNAL_FILE_IMPORTED, this, "_import_raw_file_selected");
-	_brush_panel->init_params(
+	_panel = memnew(HeightMapEditorPanel);
+	_panel->connect(HeightMapEditorPanel::SIGNAL_TEXTURE_INDEX_SELECTED, this, "_on_texture_index_selected");
+	HeightMapBrushEditor &brush_panel = _panel->get_brush_editor();
+	brush_panel.connect(HeightMapBrushEditor::SIGNAL_PARAM_CHANGED, this, "_on_brush_param_changed");
+	brush_panel.init_params(
 			_brush.get_radius(),
 			_brush.get_opacity(),
 			_brush.get_flatten_height());
-	add_control_to_container(CONTAINER_SPATIAL_EDITOR_BOTTOM, _brush_panel);
-	_brush_panel->hide();
+	add_control_to_container(CONTAINER_SPATIAL_EDITOR_BOTTOM, _panel);
+	_panel->hide();
 
 	_toolbar = memnew(HBoxContainer);
 	add_control_to_container(CONTAINER_SPATIAL_EDITOR_MENU, _toolbar);
 	_toolbar->hide();
 
+	MenuButton *heightmap_menu = memnew(MenuButton);
+	heightmap_menu->set_text(TTR("HeightMap"));
+	heightmap_menu->get_popup()->add_item(TTR("Import RAW..."), MENU_IMPORT_RAW);
+	heightmap_menu->get_popup()->connect("id_pressed", this, "_menu_item_selected");
+	_toolbar->add_child(heightmap_menu);
+
 	// TODO Need proper icons, these are borrowed from existing ones
 	Ref<Texture> mode_icons[HeightMapBrush::MODE_COUNT];
-	mode_icons[HeightMapBrush::MODE_ADD] = get_icon("AnimSet");
-	mode_icons[HeightMapBrush::MODE_SUBTRACT] = get_icon("AnimGet");
+	mode_icons[HeightMapBrush::MODE_ADD] = get_icon("ConvexPolygonShape2D");
+	mode_icons[HeightMapBrush::MODE_SUBTRACT] = get_icon("ConcavePolygonShape2D");
 	mode_icons[HeightMapBrush::MODE_SMOOTH] = get_icon("SphereShape");
-	mode_icons[HeightMapBrush::MODE_FLATTEN] = get_icon("HSize");
-	//mode_icons[HeightMapBrush::MODE_TEXTURE] = get_icon("ImmediateGeometry");
+	mode_icons[HeightMapBrush::MODE_FLATTEN] = get_icon("Hsize");
+	mode_icons[HeightMapBrush::MODE_SPLAT] = get_icon("CanvasItem");
+	mode_icons[HeightMapBrush::MODE_COLOR] = get_icon("CanvasItemShader");
+	mode_icons[HeightMapBrush::MODE_MASK] = get_icon("BitMap");
 
 	String mode_tooltip[HeightMapBrush::MODE_COUNT];
-	mode_tooltip[HeightMapBrush::MODE_ADD] = TTR("Add");
-	mode_tooltip[HeightMapBrush::MODE_SUBTRACT] = TTR("Subtract");
+	mode_tooltip[HeightMapBrush::MODE_ADD] = TTR("Raise");
+	mode_tooltip[HeightMapBrush::MODE_SUBTRACT] = TTR("Lower");
 	mode_tooltip[HeightMapBrush::MODE_SMOOTH] = TTR("Smooth");
 	mode_tooltip[HeightMapBrush::MODE_FLATTEN] = TTR("Flatten");
-	//mode_tooltip[HeightMapBrush::MODE_TEXTURE] = TTR("Texture paint");
+	mode_tooltip[HeightMapBrush::MODE_SPLAT] = TTR("Texture paint");
 	mode_tooltip[HeightMapBrush::MODE_COLOR] = TTR("Color paint");
+	mode_tooltip[HeightMapBrush::MODE_MASK] = TTR("Mask");
 
 	_toolbar->add_child(memnew(VSeparator));
 
@@ -54,7 +65,7 @@ HeightMapEditorPlugin::HeightMapEditorPlugin(EditorNode *p_editor) {
 		// TODO Fix ButtonArray look so that we can use icons that have a visible pressed state!
 		ToolButton *button = memnew(ToolButton);
 		button->set_icon(mode_icons[mode]);
-		button->set_text(mode_tooltip[mode]);
+		//button->set_text(mode_tooltip[mode]);
 		button->set_tooltip(mode_tooltip[mode]);
 		button->set_toggle_mode(true);
 		button->set_button_group(mode_group_ref);
@@ -69,6 +80,15 @@ HeightMapEditorPlugin::HeightMapEditorPlugin(EditorNode *p_editor) {
 
 	EditorInterface *editor_interface = get_editor_interface();
 	Control *base_control = editor_interface->get_base_control();
+
+	_import_dialog = memnew(FileDialog);
+	_import_dialog->connect("file_selected", this, "_import_raw_file_selected");
+	_import_dialog->set_mode(FileDialog::MODE_OPEN_FILE);
+	_import_dialog->add_filter("*.raw ; RAW files");
+	_import_dialog->set_size(Vector2(400, 300));
+	_import_dialog->set_resizable(true);
+	_import_dialog->set_access(FileDialog::ACCESS_FILESYSTEM);
+	base_control->add_child(_import_dialog);
 
 	_import_confirmation_dialog = memnew(ConfirmationDialog);
 	base_control->add_child(_import_confirmation_dialog);
@@ -137,6 +157,12 @@ bool HeightMapEditorPlugin::forward_spatial_gui_input(Camera *p_camera, const Re
 							break;
 						case HeightMapData::CHANNEL_HEIGHT:
 							action_name = TTR("Modify HeightMapData Height");
+							break;
+						case HeightMapData::CHANNEL_SPLAT:
+							action_name = TTR("Modify HeightMapData Splat");
+							break;
+						case HeightMapData::CHANNEL_MASK:
+							action_name = TTR("Modify HeightMapData Mask");
 							break;
 						default:
 							action_name = TTR("Modify HeightMapData");
@@ -211,33 +237,47 @@ bool HeightMapEditorPlugin::handles(Object *p_object) const {
 }
 
 void HeightMapEditorPlugin::make_visible(bool p_visible) {
-	_brush_panel->set_visible(p_visible);
+	_panel->set_visible(p_visible);
 	_toolbar->set_visible(p_visible);
 }
 
-void HeightMapEditorPlugin::_mode_selected(int mode) {
+void HeightMapEditorPlugin::_mode_selected(HeightMapBrush::Mode mode) {
 	ERR_FAIL_COND(mode < 0 || mode >= HeightMapBrush::MODE_COUNT);
 	_brush.set_mode((HeightMapBrush::Mode)mode);
 }
 
-void HeightMapEditorPlugin::_brush_param_changed(Variant value, int param) {
+void HeightMapEditorPlugin::_brush_param_changed(Variant value, HeightMapBrushEditor::Param param) {
 
 	switch (param) {
-		case HeightMapBrushPanel::BRUSH_SIZE:
+		case HeightMapBrushEditor::BRUSH_SIZE:
 			_brush.set_radius(value);
 			break;
 
-		case HeightMapBrushPanel::BRUSH_OPACITY:
+		case HeightMapBrushEditor::BRUSH_OPACITY:
 			_brush.set_opacity(value);
 			break;
 
-		case HeightMapBrushPanel::BRUSH_HEIGHT:
+		case HeightMapBrushEditor::BRUSH_HEIGHT:
 			_brush.set_flatten_height(value);
+			break;
+
+		case HeightMapBrushEditor::BRUSH_COLOR:
+			_brush.set_color(value);
 			break;
 
 		default:
 			ERR_PRINT("Unknown parameter");
 			break;
+	}
+}
+
+void HeightMapEditorPlugin::_on_texture_index_selected(int index) {
+	_brush.set_texture_index(index);
+}
+
+void HeightMapEditorPlugin::_menu_item_selected(int id) {
+	if(id == MENU_IMPORT_RAW) {
+		_import_dialog->popup();
 	}
 }
 
@@ -355,6 +395,8 @@ void HeightMapEditorPlugin::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("_height_map_exited_scene"), &HeightMapEditorPlugin::_height_map_exited_scene);
 	ClassDB::bind_method(D_METHOD("_import_raw_file_selected", "path"), &HeightMapEditorPlugin::_import_raw_file_selected);
 	ClassDB::bind_method(D_METHOD("_import_raw_file"), &HeightMapEditorPlugin::_import_raw_file);
+	ClassDB::bind_method(D_METHOD("_menu_item_selected", "id"), &HeightMapEditorPlugin::_menu_item_selected);
+	ClassDB::bind_method(D_METHOD("_on_texture_index_selected", "index"), &HeightMapEditorPlugin::_on_texture_index_selected);
 }
 
 //------------------------------------------

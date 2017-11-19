@@ -4,19 +4,21 @@
 #include <scene/gui/label.h>
 #include <scene/gui/slider.h>
 #include <scene/gui/spin_box.h>
+#include <scene/gui/split_container.h>
 
-class HeightMapBrushPanel : public Control {
-	GDCLASS(HeightMapBrushPanel, Control)
+class HeightMapBrushEditor : public Control {
+	GDCLASS(HeightMapBrushEditor, Control)
 public:
-	HeightMapBrushPanel();
-	~HeightMapBrushPanel();
 
-	static const char *PARAM_CHANGED;
-	static const char *SIGNAL_FILE_IMPORTED;
+	static const char *SIGNAL_PARAM_CHANGED;
 
-	enum Params {
+	HeightMapBrushEditor();
+	~HeightMapBrushEditor();
+
+	enum Param {
 		BRUSH_SIZE = 0,
 		BRUSH_OPACITY,
+		BRUSH_COLOR,
 		BRUSH_HEIGHT
 	};
 
@@ -27,7 +29,6 @@ protected:
 
 private:
 	void on_param_changed(Variant value, int param);
-	void _import_file_selected(String p_path);
 
 private:
 	Label *_size_label;
@@ -38,5 +39,29 @@ private:
 
 	SpinBox *_height_edit;
 };
+
+class HeightMapEditorPanel : public Control {
+	GDCLASS(HeightMapEditorPanel, Control)
+public:
+
+	static const char *SIGNAL_TEXTURE_INDEX_SELECTED;
+
+	HeightMapEditorPanel();
+	~HeightMapEditorPanel();
+
+	HeightMapBrushEditor &get_brush_editor() const { return *_brush_editor; }
+
+private:
+	void _on_texture_index_selected(int i);
+
+	static void _bind_methods();
+
+private:
+	HeightMapBrushEditor *_brush_editor;
+};
+
+
+VARIANT_ENUM_CAST(HeightMapBrushEditor::Param)
+
 
 #endif // HEIGHT_MAP_BRUSH_PANEL_H

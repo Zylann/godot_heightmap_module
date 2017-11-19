@@ -16,7 +16,7 @@ const int HeightMapData::MAX_RESOLUTION = 4096 + 1;
 // For serialization
 const char *HEIGHTMAP_MAGIC_V1 = "GDHM";
 //const char *HEIGHTMAP_SUB_V1 = "v1__";
-const char *HEIGHTMAP_SUB_V = "v2__";
+const char *HEIGHTMAP_SUB_V = "v3__";
 
 
 // Important note about heightmap resolution:
@@ -95,15 +95,53 @@ void HeightMapData::set_resolution(int p_res) {
 	if (_images[CHANNEL_COLOR].is_null()) {
 		_images[CHANNEL_COLOR].instance();
 		_images[CHANNEL_COLOR]->create(_resolution, _resolution, false, get_channel_format(CHANNEL_COLOR));
+		_images[CHANNEL_COLOR]->fill(Color(1, 1, 1));
 	} else {
 		_images[CHANNEL_COLOR]->resize(_resolution, _resolution);
 	}
 
-	//	for (int i = 0; i < TEXTURE_INDEX_COUNT; ++i) {
-	//		// Sum of all weights must be 1, so we fill first slot with 1 and others with 0
-	//		texture_weights[i].resize(size, true, i == 0 ? 1 : 0);
-	//		texture_indices[i].resize(size, true, 0);
-	//	}
+	// Resize splats
+	if (_images[CHANNEL_SPLAT].is_null()) {
+
+		_images[CHANNEL_SPLAT].instance();
+		_images[CHANNEL_SPLAT]->create(_resolution, _resolution, false, get_channel_format(CHANNEL_SPLAT));
+
+		Image &im = **_images[CHANNEL_SPLAT];
+		PoolVector<uint8_t> data = im.get_data();
+		PoolVector<uint8_t>::Write w = data.write();
+
+		int len = data.size();
+		const int bytes_per_pixel = 2;
+		ERR_FAIL_COND(len != im.get_width() * im.get_height() * bytes_per_pixel);
+
+		// Initialize weights so we can see the default texture
+		for(int i = 1; i < len; i += 2) {
+			w[i] = 128;
+		}
+
+	} else {
+		_images[CHANNEL_SPLAT]->resize(_resolution, _resolution);
+	}
+
+	// Resize mask
+	if (_images[CHANNEL_MASK].is_null()) {
+
+		_images[CHANNEL_MASK].instance();
+		_images[CHANNEL_MASK]->create(_resolution, _resolution, false, get_channel_format(CHANNEL_MASK));
+
+		Image &im = **_images[CHANNEL_MASK];
+		PoolVector<uint8_t> data = im.get_data();
+		PoolVector<uint8_t>::Write w = data.write();
+
+		int len = data.size();
+		ERR_FAIL_COND(len != im.get_width() * im.get_height());
+
+		// Initialize mask so the terrain has no holes by default
+		memset(w.ptr(), 255, len);
+
+	} else {
+		_images[CHANNEL_SPLAT]->resize(_resolution, _resolution);
+	}
 
 	Point2i csize = Point2i(p_res, p_res) / HeightMap::CHUNK_SIZE;
 	// TODO Could set `preserve_data` to true, but would require callback to construct new cells
@@ -181,7 +219,9 @@ void HeightMapData::notify_region_change(Point2i min, Point2i max, HeightMapData
 			break;
 
 		case CHANNEL_NORMAL:
+		case CHANNEL_SPLAT:
 		case CHANNEL_COLOR:
+		case CHANNEL_MASK:
 			upload_region(channel, min, max);
 			break;
 
@@ -218,7 +258,7 @@ void HeightMapData::_apply_undo(Dictionary undo_data) {
 	}
 	for (int i = 0; i < chunk_datas.size(); ++i) {
 		Variant d = chunk_datas[i];
-		ERR_FAIL_COND(d.get_type() != Variant::POOL_BYTE_ARRAY);
+		ERR_FAIL_COND(d.get_type() != Variant::OBJECT);
 	}
 
 	// Apply
@@ -246,7 +286,9 @@ void HeightMapData::_apply_undo(Dictionary undo_data) {
 				update_normals(min - Point2i(1, 1), max + Point2i(1, 1));
 				break;
 
+			case CHANNEL_SPLAT:
 			case CHANNEL_COLOR:
+			case CHANNEL_MASK:
 				ERR_FAIL_COND(_images[channel].is_null())
 				_images[channel]->blit_rect(data, data_rect, min);
 				break;
@@ -281,7 +323,7 @@ void HeightMapData::upload_region(Channel channel, Point2i min, Point2i max) {
 
 	int flags = 0;
 
-	if (channel == CHANNEL_NORMAL) {
+	if (channel == CHANNEL_NORMAL || channel == CHANNEL_COLOR) {
 		// To allow smooth shading in fragment shader
 		flags |= Texture::FLAG_FILTER;
 	}
@@ -459,8 +501,13 @@ Image::Format HeightMapData::get_channel_format(Channel channel) {
 			return Image::FORMAT_RH;
 		case CHANNEL_NORMAL:
 			return Image::FORMAT_RGB8;
+		case CHANNEL_SPLAT:
+			return Image::FORMAT_RG8;
 		case CHANNEL_COLOR:
 			return Image::FORMAT_RGBA8;
+		case CHANNEL_MASK:
+			// TODO A bitmap would be 8 times lighter...
+			return Image::FORMAT_R8;
 	}
 	print_line("Unrecognized channel");
 	return Image::FORMAT_MAX;
@@ -495,9 +542,6 @@ Error HeightMapData::_save(FileAccess &f) {
 
 		write_channel(f, _images[channel]);
 	}
-
-	// TODO Texture indices
-	// TODO Texture weights
 
 	return OK;
 }
@@ -555,9 +599,6 @@ Error HeightMapData::_load(FileAccess &f) {
 
 	_chunked_vertical_bounds.resize(size, false);
 	update_vertical_bounds();
-
-	// TODO Texture indices
-	// TODO Texture weights
 
 	return OK;
 }
