@@ -160,6 +160,7 @@ void foreach_xy(
 
 	Point2i min = origin;
 	Point2i max = min + shape_size;
+	Point2i min_noclamp = min;
 
 	clamp_min_max_excluded(min, max, Point2i(0,0), Point2i(data.get_resolution(), data.get_resolution()));
 
@@ -167,7 +168,7 @@ void foreach_xy(
 	for (pos.y = min.y; pos.y < max.y; ++pos.y) {
 		for (pos.x = min.x; pos.x < max.x; ++pos.x) {
 
-			float shape_value = shape.get(pos - min);
+			float shape_value = shape.get(pos - min_noclamp);
 			op(data, pos, s * shape_value);
 		}
 	}
@@ -350,6 +351,7 @@ void HeightMapBrush::paint_splat(HeightMapData &data, Point2i origin) {
 
 	Point2i min = origin;
 	Point2i max = min + shape_size;
+	Point2i min_noclamp = min;
 
 	clamp_min_max_excluded(min, max, Point2i(0,0), Point2i(data.get_resolution(), data.get_resolution()));
 
@@ -361,7 +363,7 @@ void HeightMapBrush::paint_splat(HeightMapData &data, Point2i origin) {
 	for (pos.y = min.y; pos.y < max.y; ++pos.y) {
 		for (pos.x = min.x; pos.x < max.x; ++pos.x) {
 
-			float shape_value = _shape.get(pos - min);
+			float shape_value = _shape.get(pos - min_noclamp);
 
 			if(shape_value > shape_threshold) {
 
@@ -403,6 +405,7 @@ void HeightMapBrush::paint_mask(HeightMapData &data, Point2i origin) {
 
 	Point2i min = origin;
 	Point2i max = min + shape_size;
+	Point2i min_noclamp = min;
 
 	clamp_min_max_excluded(min, max, Point2i(0,0), Point2i(data.get_resolution(), data.get_resolution()));
 
@@ -415,7 +418,7 @@ void HeightMapBrush::paint_mask(HeightMapData &data, Point2i origin) {
 	for (pos.y = min.y; pos.y < max.y; ++pos.y) {
 		for (pos.x = min.x; pos.x < max.x; ++pos.x) {
 
-			float shape_value = _shape.get(pos - min);
+			float shape_value = _shape.get(pos - min_noclamp);
 
 			if(shape_value > shape_threshold) {
 				im.set_pixel(pos.x, pos.y, value);
