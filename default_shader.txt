@@ -23,7 +23,7 @@ void vertex() {
 
 void fragment() {
 
-	float mask = texture(mask_texture).r;
+	float mask = texture(mask_texture, UV).r;
 	if(mask > 0.5)
 		discard;
 
