@@ -5,7 +5,7 @@
 #include "editor/editor_plugin.h"
 #include "height_map.h"
 #include "height_map_brush.h"
-#include "height_map_brush_panel.h"
+#include "height_map_editor_panel.h"
 
 class HeightMapEditorPlugin : public EditorPlugin {
 	GDCLASS(HeightMapEditorPlugin, EditorPlugin)

@@ -1,4 +1,4 @@
-#include "height_map_brush_panel.h"
+#include "height_map_editor_panel.h"
 #include "height_map_data.h"
 
 #include "scene/gui/button.h"
