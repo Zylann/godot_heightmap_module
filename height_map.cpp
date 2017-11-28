@@ -436,6 +436,15 @@ void HeightMap::_process() {
 
 	_pending_chunk_updates.clear();
 
+#ifdef TOOLS_ENABLED
+	if(Engine::get_singleton()->is_editor_hint()) {
+		// TODO I would reaaaally like to get rid of this... it just look inefficient,
+		// and it won't play nice if more materials are used internally.
+		// Initially needed so that custom materials can be tweaked in editor.
+		update_material_params();
+	}
+#endif
+
 	// DEBUG
 //	if(_updated_chunks > 0) {
 //		print_line(String("Remeshed {0} chunks").format(varray(_updated_chunks)));
@@ -534,6 +543,7 @@ void HeightMap::set_area_dirty(Point2i origin_in_cells, Point2i size_in_cells) {
 // Called when a chunk is needed to be seen
 HeightMapChunk *HeightMap::_make_chunk_cb(Point2i cpos, int lod) {
 
+	// TODO What if cpos is invalid? get_chunk_at will return NULL but that's still invalid
 	HeightMapChunk *chunk = get_chunk_at(cpos, lod);
 
 	if(chunk == NULL) {
