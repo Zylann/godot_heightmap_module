@@ -151,23 +151,63 @@ void HeightMapData::set_resolution(int p_res) {
 	emit_signal(SIGNAL_RESOLUTION_CHANGED);
 }
 
-void HeightMapData::update_all_normals() {
-	update_normals(Point2i(), Point2i(_resolution, _resolution));
-}
-
 inline Color get_clamped(const Image &im, int x, int y) {
 
 	if (x < 0)
 		x = 0;
+	else if(x >= im.get_width())
+		x = im.get_width() - 1;
+
 	if (y < 0)
 		y = 0;
-
-	if (x >= im.get_width())
-		x = im.get_width() - 1;
-	if (y >= im.get_height())
+	else if (y >= im.get_height())
 		y = im.get_height() - 1;
 
 	return im.get_pixel(x, y);
+}
+
+real_t HeightMapData::get_height_at(int x, int y) {
+	// This function is relatively slow due to locking, so don't use it to fetch large areas
+
+	// Height data must be loaded in RAM
+	ERR_FAIL_COND_V(_images[CHANNEL_HEIGHT].is_null(), 0.0);
+
+	Image &im = **_images[CHANNEL_HEIGHT];
+	im.lock();
+	real_t h = get_clamped(im, x, y).r;
+	im.unlock();
+	return h;
+}
+
+real_t HeightMapData::get_interpolated_height_at(Vector3 pos) {
+	// This function is relatively slow due to locking, so don't use it to fetch large areas
+
+	// Height data must be loaded in RAM
+	ERR_FAIL_COND_V(_images[CHANNEL_HEIGHT].is_null(), 0.0);
+
+	// The function takes a Vector3 for convenience so it's easier to use in 3D scripting
+	int x0 = pos.x;
+	int y0 = pos.z;
+
+	real_t xf = pos.x - x0;
+	real_t yf = pos.z - y0;
+
+	Image &im = **_images[CHANNEL_HEIGHT];
+	im.lock();
+	real_t h00 = get_clamped(im, x0, y0).r;
+	real_t h10 = get_clamped(im, x0 + 1, y0).r;
+	real_t h01 = get_clamped(im, x0, y0 + 1).r;
+	real_t h11 = get_clamped(im, x0 + 1, y0 + 1).r;
+	im.unlock();
+
+	// Bilinear filter
+	real_t h = Math::lerp(Math::lerp(h00, h10, xf), Math::lerp(h01, h11, xf), yf);
+
+	return h;
+}
+
+void HeightMapData::update_all_normals() {
+	update_normals(Point2i(), Point2i(_resolution, _resolution));
 }
 
 void HeightMapData::update_normals(Point2i min, Point2i size) {
@@ -477,6 +517,9 @@ void HeightMapData::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_resolution", "p_res"), &HeightMapData::set_resolution);
 	ClassDB::bind_method(D_METHOD("get_resolution"), &HeightMapData::get_resolution);
+
+	ClassDB::bind_method(D_METHOD("get_height_at", "x", "y"), &HeightMapData::get_height_at);
+	ClassDB::bind_method(D_METHOD("get_interpolated_height_at", "pos"), &HeightMapData::get_interpolated_height_at);
 
 	//#ifdef TOOLS_ENABLED
 	ClassDB::bind_method(D_METHOD("_apply_undo", "data"), &HeightMapData::_apply_undo);

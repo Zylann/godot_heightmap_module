@@ -38,6 +38,9 @@ public:
 	void set_resolution(int p_res);
 	int get_resolution() const;
 
+	real_t get_height_at(int x, int y);
+	real_t get_interpolated_height_at(Vector3 pos);
+
 	void update_all_normals();
 	void update_normals(Point2i min, Point2i size);
 
