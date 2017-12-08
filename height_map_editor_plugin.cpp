@@ -40,13 +40,13 @@ HeightMapEditorPlugin::HeightMapEditorPlugin(EditorNode *p_editor) {
 
 	// TODO Need proper icons, these are borrowed from existing ones
 	Ref<Texture> mode_icons[HeightMapBrush::MODE_COUNT];
-	mode_icons[HeightMapBrush::MODE_ADD] = get_icon("ConvexPolygonShape2D");
-	mode_icons[HeightMapBrush::MODE_SUBTRACT] = get_icon("ConcavePolygonShape2D");
-	mode_icons[HeightMapBrush::MODE_SMOOTH] = get_icon("SphereShape");
-	mode_icons[HeightMapBrush::MODE_FLATTEN] = get_icon("Hsize");
-	mode_icons[HeightMapBrush::MODE_SPLAT] = get_icon("CanvasItem");
-	mode_icons[HeightMapBrush::MODE_COLOR] = get_icon("CanvasItemShader");
-	mode_icons[HeightMapBrush::MODE_MASK] = get_icon("BitMap");
+	mode_icons[HeightMapBrush::MODE_ADD] = ::get_icon("ConvexPolygonShape2D");
+	mode_icons[HeightMapBrush::MODE_SUBTRACT] = ::get_icon("ConcavePolygonShape2D");
+	mode_icons[HeightMapBrush::MODE_SMOOTH] = ::get_icon("SphereShape");
+	mode_icons[HeightMapBrush::MODE_FLATTEN] = ::get_icon("Hsize");
+	mode_icons[HeightMapBrush::MODE_SPLAT] = ::get_icon("CanvasItem");
+	mode_icons[HeightMapBrush::MODE_COLOR] = ::get_icon("CanvasItemShader");
+	mode_icons[HeightMapBrush::MODE_MASK] = ::get_icon("BitMap");
 
 	String mode_tooltip[HeightMapBrush::MODE_COUNT];
 	mode_tooltip[HeightMapBrush::MODE_ADD] = TTR("Raise");
