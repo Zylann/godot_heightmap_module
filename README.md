@@ -1,6 +1,8 @@
 Heightmap Terrain for Godot Engine 3.0
 ========================================
 
+**For a more recent, plugin version of this module, see https://github.com/Zylann/godot_heightmap_module**
+
 ![Editor screenshot](screenshot.png)
 
 C++ module for creating heightmaps.
