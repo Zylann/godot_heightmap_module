@@ -1,7 +1,7 @@
 Heightmap Terrain for Godot Engine 3.0
 ========================================
 
-**For a more recent, plugin version of this module, see https://github.com/Zylann/godot_heightmap_module**
+**For a more recent, plugin version of this module, see https://github.com/Zylann/godot_heightmap_native_plugin**
 
 ![Editor screenshot](screenshot.png)
 
